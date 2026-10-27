@@ -23,3 +23,5 @@ htmlcov/
 sandbox/local_output/
 spark-warehouse/
 metastore_db/
+.env
+.streamlit/secrets.toml

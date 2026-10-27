@@ -1,0 +1,12 @@
+run_id,check_name,status,severity,message,affected_output,created_at
+20261027T071447903919Z,lakeflow_task_run_timeline_available,PASS,INFO,spark_catalog.synthetic_system.lakeflow_job_task_run_timeline is available.,job_reliability_summary.retry_count,2026-10-27 07:15:26.275908
+20261027T071447903919Z,cost_attribution_quality,WARN,MEDIUM,Estimated cost with LOW or UNKNOWN attribution: 1574.634988.,"daily_cost,workload_cost_summary,optimization_candidates",2026-10-27 07:15:26.275908
+20261027T071447903919Z,lakeflow_jobs_available,PASS,INFO,spark_catalog.synthetic_system.lakeflow_jobs is available.,"daily_cost,workload_cost_summary,job_reliability_summary",2026-10-27 07:15:26.275908
+20261027T071447903919Z,tagging_coverage,WARN,LOW,Estimated cost with at least one missing required tag: 2127.088166.,"tagging_quality_summary,optimization_candidates",2026-10-27 07:15:26.275908
+20261027T071447903919Z,lakeflow_job_run_timeline_available,PASS,INFO,spark_catalog.synthetic_system.lakeflow_job_run_timeline is available.,job_reliability_summary,2026-10-27 07:15:26.275908
+20261027T071447903919Z,node_timeline_available,PASS,INFO,spark_catalog.synthetic_system.compute_node_timeline is available.,compute_utilization_summary,2026-10-27 07:15:26.275908
+20261027T071447903919Z,pricing_join_success,WARN,MEDIUM,360 daily cost rows used list prices; 60 used fallback DBU price; 0 mixed; 0 unknown.,daily_cost,2026-10-27 07:15:26.275908
+20261027T071447903919Z,list_prices_available,PASS,INFO,spark_catalog.synthetic_system.billing_list_prices is available.,daily_cost,2026-10-27 07:15:26.275908
+20261027T071447903919Z,optimization_candidate_count,PASS,INFO,12 optimization candidates were generated.,optimization_candidates,2026-10-27 07:15:26.275908
+20261027T071447903919Z,billing_usage_available,PASS,INFO,spark_catalog.synthetic_system.billing_usage is available.,all_outputs,2026-10-27 07:15:26.275908
+20261027T071447903919Z,workload_count,PASS,INFO,12 workloads were summarized.,workload_cost_summary,2026-10-27 07:15:26.275908

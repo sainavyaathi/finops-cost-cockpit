@@ -4,8 +4,8 @@ version = "0.3.0"
 description = "Databricks FinOps Accelerator packaged as a serverless Databricks Asset Bundle wheel job."
 authors = ["FinOps Platform Team <finops-platform@example.invalid>"]
 readme = "README.md"
-packages = [{ include = "databricks_finops", from = "src" }]
-include = ["src/databricks_finops/sql/**/*.sql"]
+packages = [{ include = "databricks_finops", from = "src" }, { include = "cockpit", from = "src" }]
+include = ["src/databricks_finops/sql/**/*.sql", "src/cockpit/sql/**/*.sql"]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
@@ -16,6 +16,7 @@ PyYAML = "^6.0.2"
 
 [tool.poetry.scripts]
 main = "databricks_finops.main:main"
+cockpit = "cockpit.pipeline:main"
 
 [build-system]
 requires = ["poetry-core>=1.8.0"]

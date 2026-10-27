@@ -1,0 +1,17 @@
+variables:
+  warehouse_id:
+    description: SQL warehouse the cockpit app reads through.
+    lookup:
+      warehouse: "Serverless Starter Warehouse"
+
+resources:
+  apps:
+    cockpit_app:
+      name: finops-cost-cockpit
+      description: "FinOps Cost Cockpit (Streamlit)"
+      source_code_path: ../app
+      resources:
+        - name: sql-warehouse
+          sql_warehouse:
+            id: ${var.warehouse_id}
+            permission: CAN_USE

@@ -7,6 +7,7 @@ Usage (from the repo root):
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -26,7 +27,11 @@ def build_spark():
     from delta import configure_spark_with_delta_pip
     from pyspark.sql import SparkSession
 
-    warehouse = (ROOT / ".local_spark" / "warehouse").as_posix()
+    # Local Spark keeps its catalog in memory, so table files left by a previous run would block
+    # CREATE TABLE. Everything here is regenerated each run, so start from an empty warehouse.
+    warehouse_dir = ROOT / ".local_spark" / "warehouse"
+    shutil.rmtree(warehouse_dir, ignore_errors=True)
+    warehouse = warehouse_dir.as_posix()
     builder = (
         SparkSession.builder.appName("finops-local")
         .master("local[*]")

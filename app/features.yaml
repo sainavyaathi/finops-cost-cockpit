@@ -1,0 +1,10 @@
+# Turn cockpit pages on/off or reorder them without touching code.
+# Keys are Feature ids (the folder name under app/cockpit_ui/features/).
+# A feature that is not listed here is enabled with its own default order.
+features:
+  overview:    {enabled: true, order: 10}
+  backlog:     {enabled: true, order: 20}
+  utilization: {enabled: true, order: 30}
+  reliability: {enabled: true, order: 40}
+  tagging:     {enabled: true, order: 50}
+  health:      {enabled: true, order: 90}
