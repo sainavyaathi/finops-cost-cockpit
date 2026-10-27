@@ -1,0 +1,5 @@
+CREATE OR REPLACE VIEW {view_name} AS
+SELECT *
+FROM {candidates_table}
+WHERE issue_type IN ('HIGH_COST_LOW_UTILIZATION', 'LOW_UTILIZATION', 'MEMORY_BOUND')
+ORDER BY priority_rank

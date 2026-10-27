@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "databricks_finops"
+version = "0.3.0"
+description = "Databricks FinOps Accelerator packaged as a serverless Databricks Asset Bundle wheel job."
+authors = ["FinOps Platform Team <finops-platform@example.invalid>"]
+readme = "README.md"
+packages = [{ include = "databricks_finops", from = "src" }]
+include = ["src/databricks_finops/sql/**/*.sql"]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+PyYAML = "^6.0.2"
+
+[tool.poetry.scripts]
+main = "databricks_finops.main:main"
+
+[build-system]
+requires = ["poetry-core>=1.8.0"]
+build-backend = "poetry.core.masonry.api"

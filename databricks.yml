@@ -1,0 +1,61 @@
+bundle:
+  name: databricks_finops_accelerator
+
+include:
+  - resources/*.yml
+
+artifacts:
+  default:
+    type: whl
+    path: .
+    build: poetry build
+
+variables:
+  catalog:
+    default: finops
+
+  schema:
+    default: accelerator
+
+  lookback_days:
+    default: 30
+
+  currency_code:
+    default: USD
+
+  display_currency:
+    default: USD
+
+  fallback_dbu_price:
+    default: 0.55
+
+  pause_status:
+    default: PAUSED
+
+targets:
+  dev:
+    default: true
+    mode: development
+    variables:
+      catalog: finops
+      schema: accelerator
+      lookback_days: 30
+      currency_code: USD
+      display_currency: USD
+      fallback_dbu_price: 0.55
+      pause_status: PAUSED
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+  prod:
+    mode: production
+    variables:
+      catalog: finops
+      schema: accelerator
+      lookback_days: 30
+      currency_code: USD
+      display_currency: USD
+      fallback_dbu_price: 0.55
+      pause_status: PAUSED
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}

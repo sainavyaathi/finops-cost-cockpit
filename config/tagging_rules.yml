@@ -1,0 +1,42 @@
+required_tags:
+  - project
+  - team
+  - owner
+  - environment
+  - cost_center
+
+critical_tags:
+  - owner
+  - team
+  - cost_center
+
+tag_aliases:
+  project:
+    - project
+    - Project
+    - PROJECT
+    - app
+    - application
+  team:
+    - team
+    - Team
+    - TEAM
+    - department
+    - group
+  owner:
+    - owner
+    - Owner
+    - OWNER
+    - email
+    - contact
+  environment:
+    - environment
+    - Environment
+    - env
+    - ENV
+  cost_center:
+    - cost_center
+    - CostCenter
+    - costCenter
+    - cost-centre
+    - cost_centre

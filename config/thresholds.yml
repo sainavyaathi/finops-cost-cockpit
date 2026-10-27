@@ -1,0 +1,21 @@
+thresholds:
+  low_cpu_pct: 20
+  very_low_cpu_pct: 10
+  low_memory_pct: 40
+  high_memory_pct: 80
+  high_cost_low_utilization_min_cost: 10
+  expensive_monthly_cost: 100
+  high_failure_rate_pct: 20
+  high_failed_cost: 10
+  retry_heavy_count: 5
+
+scoring_weights:
+  cost: 0.45
+  waste: 0.25
+  reliability: 0.15
+  tagging: 0.10
+  frequency: 0.05
+
+priority:
+  high_priority_threshold: 80
+  medium_priority_threshold: 50
