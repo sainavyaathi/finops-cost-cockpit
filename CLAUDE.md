@@ -2,6 +2,8 @@
 
 A 4-week POC built by **Navya** (GitHub `sainavyaathi`) and **Nikhil** (GitHub `nikhil187`). It turns Databricks system tables into a cost cockpit that answers three questions: where the money goes, who owns it, and where compute is wasted. The full plan is in `docs/plan/FinOps_Cost_Cockpit_POC_Plan.pdf` (v1.1).
 
+**Read `docs/project_history.md` first.** It explains how the project started, every decision so far and the reasons behind it, and what exists in the Databricks workspace.
+
 - Private repo: https://github.com/sainavyaathi/finops-cost-cockpit
 - Work happens on branches named `<name>/<feature>`, for example `navya/f3-catalog-allocation`.
 - Changes reach `main` only through a pull request that the other person reviews.
