@@ -1,0 +1,12 @@
+team,owner,project,estimated_cost,missing_required_tag_count,worst_tagging_quality
+data-science,,,1509.596028,4,POOR
+analytics,ivan@example.com,bi_dashboards,900.896383,0,GOOD
+ml,bob@example.com,churn_model,711.788552,0,GOOD
+data-eng,carol@example.com,c360,318.482955,1,PARTIAL
+data-eng,alice@example.com,exec_reporting,298.917779,0,GOOD
+data-eng,alice@example.com,orders_stream,265.828135,0,GOOD
+,,,199.881176,5,MISSING
+data-eng,alice@example.com,sales_analytics,178.495068,0,GOOD
+,,vendor_feeds,99.128007,3,POOR
+fin-eng,erin@example.com,finance,53.537784,0,GOOD
+data-eng,kim@example.com,sales_analytics,12.804378,0,GOOD

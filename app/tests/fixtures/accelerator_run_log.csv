@@ -1,0 +1,19 @@
+run_id,task_name,status,result,started_at,ended_at,duration_seconds,rows_written,message
+20261027T071447903919Z,create_catalog_schema,SUCCESS,SUCCESS,2026-10-27 07:14:47,2026-10-27 07:14:47,0.017847,,"Catalog creation failed, likely due to permissions. Continuing with schema creation. Error: 
+[PARSE_SYNTAX_ERROR] Syntax error at or near CATALOG.(line 1, pos 7)
+
+== SQL ==
+CREATE CATALOG IF NOT EXISTS `spark_catalog`
+-------^^^
+"
+20261027T071447903919Z,build_job_reliability_summary,SUCCESS,SUCCESS,2026-10-27 07:15:04,2026-10-27 07:15:12,7.187542,7.0,job_reliability_summary built from Lakeflow run/task timeline where available
+20261027T071447903919Z,build_optimization_candidates,SUCCESS,SUCCESS,2026-10-27 07:15:14,2026-10-27 07:15:18,4.4014,12.0,optimization_candidates generated with transparent 0-100 priority scoring
+20261027T071447903919Z,build_compute_utilization_summary,SUCCESS,SUCCESS,2026-10-27 07:15:00,2026-10-27 07:15:04,3.895997,7.0,compute_utilization_summary built at CLUSTER_LOOKBACK_WINDOW grain
+20261027T071447903919Z,build_daily_cost,SUCCESS,SUCCESS,2026-10-27 07:14:48,2026-10-27 07:14:58,10.125666,420.0,daily_cost built with list price join and fallback price for unmatched rows
+20261027T071447903919Z,build_workload_cost_summary,SUCCESS,SUCCESS,2026-10-27 07:14:58,2026-10-27 07:15:00,2.645272,12.0,workload_cost_summary refreshed for current lookback window
+20261027T071447903919Z,build_tagging_quality_summary,SUCCESS,SUCCESS,2026-10-27 07:15:12,2026-10-27 07:15:14,2.111002,360.0,tagging_quality_summary refreshed from daily_cost tags
+20261027T071447903919Z,build_accelerator_summary,SUCCESS,SUCCESS,2026-10-27 07:15:18,2026-10-27 07:15:22,3.4594,1.0,accelerator_summary refreshed
+20261027T071447903919Z,create_views,SUCCESS,SUCCESS,2026-10-27 07:15:27,2026-10-27 07:15:28,0.266984,,11 dashboard-ready views created
+20261027T071447903919Z,build_accelerator_health,SUCCESS,SUCCESS,2026-10-27 07:15:22,2026-10-27 07:15:27,5.865834,11.0,completed
+20261027T071447903919Z,apply_table_comments,SUCCESS,SUCCESS,2026-10-27 07:15:28,2026-10-27 07:15:30,2.718654,,table comments applied
+20261027T071447903919Z,preflight,SUCCESS,SUCCESS,2026-10-27 07:14:47,2026-10-27 07:14:48,0.306936,,preflight checks completed

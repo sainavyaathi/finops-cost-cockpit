@@ -1,0 +1,11 @@
+command: ["streamlit", "run", "streamlit_app.py"]
+
+env:
+  - name: COCKPIT_SOURCE
+    value: databricks
+  - name: COCKPIT_CATALOG
+    value: workspace
+  - name: COCKPIT_SCHEMA
+    value: finops_accelerator
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse

@@ -1,0 +1,11 @@
+# Every pull request needs a review from the other person; feature folders route to their owner.
+*                                        @sainavyaathi @nikhil187
+
+/app/cockpit_ui/core/                    @sainavyaathi @nikhil187
+/app/cockpit_ui/features/overview/       @sainavyaathi
+/app/cockpit_ui/features/tagging/        @sainavyaathi
+/app/cockpit_ui/features/backlog/        @nikhil187
+/app/cockpit_ui/features/utilization/    @nikhil187
+/app/cockpit_ui/features/reliability/    @nikhil187
+/app/cockpit_ui/features/health/         @sainavyaathi @nikhil187
+/sandbox/                                @nikhil187

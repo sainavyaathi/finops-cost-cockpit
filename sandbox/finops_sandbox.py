@@ -508,9 +508,10 @@ def run_accelerator(
     bundle_root: str,
     lookback_days: int = 30,
 ):
-    """Run databricks_finops.main.run_pipeline against the synthetic tables."""
+    """Run the upstream pipeline plus every cockpit step against the synthetic tables."""
+    from cockpit.pipeline import run_cockpit_pipeline
     from databricks_finops.config import config_from_args, parse_args
-    from databricks_finops.main import _run_id, run_pipeline
+    from databricks_finops.main import _run_id
     from databricks_finops.run_logging import StepLogger, write_run_log
 
     proxy = RedirectingSpark(spark, source_schema)
@@ -523,7 +524,7 @@ def run_accelerator(
     run_id = _run_id()
     logger = StepLogger(run_id)
     try:
-        run_pipeline(proxy, config, run_id, logger)
+        run_cockpit_pipeline(proxy, config, run_id, logger)
     finally:
         try:
             write_run_log(proxy, catalog, schema, logger)
