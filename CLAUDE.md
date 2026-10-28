@@ -12,7 +12,7 @@ A 4-week POC built by **Navya** (GitHub `sainavyaathi`) and **Nikhil** (GitHub `
   - `main` is always demo-ready. Nothing is committed to it directly.
   - Hotfix: branch from `main`, PR into `main`, then merge `main` back into `testing` and `development`.
 - Every PR is reviewed by the other person.
-- CI runs all tests on every pull request and on every push to `development`, `testing` and `main`.
+- CI runs all tests on every pull request (including promotion PRs) and on every push to `main`.
 
 ## Architecture (three layers, one-way)
 
