@@ -65,6 +65,7 @@ Navya decided the cockpit should be a **Streamlit application** rather than a na
   - locally on synthetic CSVs (`COCKPIT_SOURCE=local`)
   - on Databricks Apps through a SQL warehouse (`COCKPIT_SOURCE=databricks`)
 - **CI and CODEOWNERS.** GitHub Actions runs every test on each pull request, and CODEOWNERS routes each feature folder to its owner for review.
+- **Branch model: feature → `development` → `testing` → `main` (28 October 2026).** Feature branches merge into `development`. Promotions to `testing` and then `main` are PRs, so `main` stays demo-ready while both of us integrate in parallel.
 
 ## Where things are on Databricks (Navya's Free Edition workspace)
 

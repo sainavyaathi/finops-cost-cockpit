@@ -5,9 +5,14 @@ A 4-week POC built by **Navya** (GitHub `sainavyaathi`) and **Nikhil** (GitHub `
 **Read `docs/project_history.md` first.** It explains how the project started, every decision so far and the reasons behind it, and what exists in the Databricks workspace.
 
 - Private repo: https://github.com/sainavyaathi/finops-cost-cockpit
-- Work happens on branches named `<name>/<feature>`, for example `navya/f3-catalog-allocation`.
-- Changes reach `main` only through a pull request that the other person reviews.
-- CI runs all tests on every pull request.
+- Branch model: `<name>/<feature>` → `development` → `testing` → `main`.
+  - Feature work happens on branches named `<name>/<feature>`, for example `navya/f3-catalog-allocation`. Branch from `development` and open the PR against `development`.
+  - `development` is the integration branch. When a set of features is ready, a PR promotes `development` to `testing`.
+  - `testing` is where the integrated build is checked end to end (sandbox pipeline + app on synthetic data, then Databricks). A PR promotes `testing` to `main`.
+  - `main` is always demo-ready. Nothing is committed to it directly.
+  - Hotfix: branch from `main`, PR into `main`, then merge `main` back into `testing` and `development`.
+- Every PR is reviewed by the other person.
+- CI runs all tests on every pull request and on every push to `development`, `testing` and `main`.
 
 ## Architecture (three layers, one-way)
 
