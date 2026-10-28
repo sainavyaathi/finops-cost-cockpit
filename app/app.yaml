@@ -6,6 +6,6 @@ env:
   - name: COCKPIT_CATALOG
     value: workspace
   - name: COCKPIT_SCHEMA
-    value: finops_accelerator
+    value: cockpit
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse

@@ -19,7 +19,7 @@ from finops_sandbox import generate_synthetic_system_tables, run_accelerator  # 
 
 SOURCE_SCHEMA = "spark_catalog.synthetic_system"
 CATALOG = "spark_catalog"  # local Spark only has the session catalog
-SCHEMA = "finops_accelerator"
+SCHEMA = "cockpit"  # rule R4: all outputs go to the cockpit schema
 OUTPUT_DIR = ROOT / "sandbox" / "local_output"
 
 
