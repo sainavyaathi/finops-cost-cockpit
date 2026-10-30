@@ -70,5 +70,5 @@ Design rules:
 
 - **Upstream retry bug (F6):** `reliability.py` `_retry_cte` groups `job_task_run_timeline` by `run_id`, which is the *task* run id, so `retry_count` is always 0. The fix is to group and join on `job_run_id`.
 - Locally, the message "Catalog creation failed" in `create_catalog_schema` is expected, because local Spark only has `spark_catalog`.
-- Databricks Free Edition: the catalog is `workspace`, synthetic sources are in `workspace.finops_synthetic`, and outputs are in `workspace.finops_accelerator`. `system.compute.clusters` is empty there.
+- Databricks Free Edition: the catalog is `workspace`, synthetic sources are in `workspace.finops_synthetic`, and outputs go to `workspace.cockpit` (rule R4; runs before F1 wrote to `workspace.finops_accelerator`). `system.compute.clusters` is empty there.
 - Never commit tokens. Databricks auth comes from env vars or the Databricks Apps service principal.

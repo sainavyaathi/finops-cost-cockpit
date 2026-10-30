@@ -22,8 +22,28 @@ def _step(name: str, *deps: str, required: bool = True, calls: list | None = Non
     return Step(name=name, run=run, depends_on=deps, required=required)
 
 
-def test_steps_package_starts_empty():
-    assert discover_steps() == []
+def test_discovers_the_cost_base_step():
+    assert "build_cost_base" in [s.name for s in discover_steps()]
+
+
+def test_cost_base_step_publishes_daily_cost_as_a_cockpit_view():
+    from cockpit.steps.cost_base import STEP
+
+    statements: list[str] = []
+
+    class FakeSpark:
+        def sql(self, statement):
+            statements.append(statement)
+
+    ctx = pipeline.StepContext(spark=FakeSpark(), config=CONFIG, run_id="r", preflight=None)
+    STEP.run(ctx)
+
+    assert STEP.output_table == "cost_base"
+    assert statements == [
+        "CREATE OR REPLACE VIEW `finops`.`cockpit`.`cost_base` AS\n"
+        "SELECT *\n"
+        "FROM `finops`.`cockpit`.`daily_cost`\n"
+    ]
 
 
 def test_order_steps_respects_dependencies():

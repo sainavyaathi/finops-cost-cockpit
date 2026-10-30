@@ -16,7 +16,7 @@ class Settings:
     COCKPIT_SOURCE        local (CSV export of a sandbox run) or databricks (SQL warehouse)
     COCKPIT_LOCAL_DIR     folder of <table>.csv files, default sandbox/local_output
     COCKPIT_CATALOG       default workspace
-    COCKPIT_SCHEMA        default finops_accelerator
+    COCKPIT_SCHEMA        default cockpit
     DATABRICKS_WAREHOUSE_ID  required for databricks; injected by Databricks Apps via app.yaml
     COCKPIT_FEATURES_FILE default app/features.yaml
     """
@@ -24,7 +24,7 @@ class Settings:
     source: str = "local"
     local_dir: Path = REPO_ROOT / "sandbox" / "local_output"
     catalog: str = "workspace"
-    schema: str = "finops_accelerator"
+    schema: str = "cockpit"
     warehouse_id: str | None = None
     features_file: Path = APP_DIR / "features.yaml"
 

@@ -4,7 +4,7 @@
 # MAGIC
 # MAGIC 1. Creates synthetic copies of the System Tables in `workspace.finops_synthetic`
 # MAGIC 2. Runs the **unmodified** `databricks_finops` pipeline, redirecting `system.*` reads to those tables
-# MAGIC 3. Writes outputs + dashboard views to `workspace.finops_accelerator`
+# MAGIC 3. Writes outputs + dashboard views to `workspace.cockpit`
 # MAGIC
 # MAGIC Requires the whole repo folder to be in your workspace (this notebook lives in `<repo>/sandbox/`).
 # MAGIC Set `USE_REAL_SYSTEM_TABLES = True` to try your real `system.billing.usage` instead.
@@ -12,7 +12,7 @@
 # COMMAND ----------
 
 dbutils.widgets.dropdown("mode", "synthetic", ["synthetic", "real"])
-dbutils.widgets.text("schema", "finops_accelerator")
+dbutils.widgets.text("schema", "cockpit")
 
 CATALOG = "workspace"                                   # Free Edition default catalog
 SCHEMA = dbutils.widgets.get("schema")                  # outputs
@@ -55,8 +55,9 @@ for t in ["system.billing.usage", "system.billing.list_prices", "system.compute.
 from finops_sandbox import RedirectingSpark, generate_synthetic_system_tables, run_accelerator
 
 if USE_REAL_SYSTEM_TABLES:
+    from cockpit.pipeline import run_cockpit_pipeline
     from databricks_finops.config import config_from_args, parse_args
-    from databricks_finops.main import _run_id, run_pipeline
+    from databricks_finops.main import _run_id
     from databricks_finops.run_logging import StepLogger, write_run_log
 
     config = config_from_args(parse_args(["--catalog", CATALOG, "--schema", SCHEMA,
@@ -64,7 +65,7 @@ if USE_REAL_SYSTEM_TABLES:
     run_id = _run_id()
     logger = StepLogger(run_id)
     try:
-        run_pipeline(spark, config, run_id, logger)
+        run_cockpit_pipeline(spark, config, run_id, logger)
     finally:
         write_run_log(spark, CATALOG, SCHEMA, logger)
 else:
