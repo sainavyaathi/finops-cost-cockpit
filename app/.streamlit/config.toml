@@ -1,0 +1,41 @@
+# Cockpit theme. Streamlit reads this file from the working directory (Databricks Apps runs from app/)
+# and also from the folder next to the main script, so it applies to `streamlit run app/streamlit_app.py`
+# from the repo root too. Keep these values in sync with LIGHT in cockpit_ui/core/theme.py.
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#4B5BD6"
+backgroundColor = "#FAFAF9"
+secondaryBackgroundColor = "#F3F3F1"
+textColor = "#1B1B1F"
+linkColor = "#4B5BD6"
+linkUnderline = false
+borderColor = "#E5E4E0"
+dataframeBorderColor = "#EEEDEA"
+dataframeHeaderBackgroundColor = "#F6F6F4"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "6px"
+buttonRadius = "6px"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap, sans-serif"
+codeFont = "monospace"
+baseFontSize = 14
+headingFontSizes = ["1.6rem", "1.2rem", "1rem", "0.95rem", "0.9rem", "0.85rem"]
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+greenColor = "#1F7A4D"
+orangeColor = "#A8650E"
+redColor = "#B4352B"
+blueColor = "#4B5BD6"
+chartCategoricalColors = ["#4B5BD6", "#9AA4EC", "#2C3893", "#8A8F98", "#C3C8F3", "#5B616B", "#6F7DE0", "#B9BDC4"]
+
+[theme.sidebar]
+backgroundColor = "#F4F4F2"
+secondaryBackgroundColor = "#EBEBE8"
+borderColor = "#E5E4E0"
+headingFontSizes = ["1rem", "0.9rem", "0.85rem", "0.8rem", "0.75rem", "0.7rem"]

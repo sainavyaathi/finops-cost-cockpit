@@ -1,10 +1,24 @@
 # Turn cockpit pages on/off or reorder them without touching code.
 # Keys are Feature ids (the folder name under app/cockpit_ui/features/).
 # A feature that is not listed here is enabled with its own default order.
+#
+# Navigation groups come from each Feature's `group`. Groups appear in the order of their
+# lowest-ordered page, and pages sort by `order` inside a group, so keep each group in its own band.
 features:
-  overview:    {enabled: true, order: 10}
-  backlog:     {enabled: true, order: 20}
-  utilization: {enabled: true, order: 30}
-  reliability: {enabled: true, order: 40}
-  tagging:     {enabled: true, order: 50}
-  health:      {enabled: true, order: 90}
+  # Overview
+  overview:           {enabled: true, order: 10}
+  # Waste
+  backlog:            {enabled: true, order: 20}
+  utilization:        {enabled: true, order: 22}
+  idle_compute:       {enabled: true, order: 24}
+  allpurpose_misuse:  {enabled: true, order: 26}
+  # Attribution
+  tagging:            {enabled: true, order: 30}
+  catalog_allocation: {enabled: true, order: 32}
+  # Operations
+  reliability:        {enabled: true, order: 40}
+  monday_alert:       {enabled: true, order: 42}
+  # Platform
+  health:             {enabled: true, order: 90}
+  connection:         {enabled: true, order: 92}
+  roadmap:            {enabled: true, order: 94}

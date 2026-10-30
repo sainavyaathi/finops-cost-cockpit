@@ -8,4 +8,10 @@
 /app/cockpit_ui/features/utilization/    @nikhil187
 /app/cockpit_ui/features/reliability/    @nikhil187
 /app/cockpit_ui/features/health/         @sainavyaathi @nikhil187
+/app/cockpit_ui/features/catalog_allocation/ @sainavyaathi
+/app/cockpit_ui/features/monday_alert/   @sainavyaathi
+/app/cockpit_ui/features/allpurpose_misuse/ @nikhil187
+/app/cockpit_ui/features/idle_compute/   @nikhil187
+/app/cockpit_ui/features/connection/     @sainavyaathi @nikhil187
+/app/cockpit_ui/features/roadmap/        @sainavyaathi @nikhil187
 /sandbox/                                @nikhil187

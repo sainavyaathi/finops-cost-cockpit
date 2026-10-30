@@ -11,6 +11,7 @@ from cockpit_ui.core.feature import Feature
 from cockpit_ui.core.registry import discover, enabled_features, load_toggles, missing_tables
 from cockpit_ui.core.settings import Settings
 
+# The original pages; more feature packages may exist alongside them.
 EXPECTED_FEATURES = {"overview", "backlog", "utilization", "reliability", "tagging", "health"}
 
 
@@ -23,7 +24,7 @@ def _noop(ctx) -> None:
 def test_discover_finds_every_feature_package():
     discovery = discover()
     assert discovery.errors == {}
-    assert {f.id for f in discovery.features} == EXPECTED_FEATURES
+    assert EXPECTED_FEATURES <= {f.id for f in discovery.features}
 
 
 def test_toggles_disable_and_reorder(tmp_path: Path):
@@ -78,7 +79,35 @@ def test_feature_requirements_are_produced_by_the_engine():
 
     produced = {name.lower() for name in [*OUTPUT_TABLES, *OUTPUT_VIEWS]}
     for feature in discover().features:
+        if feature.is_planned:  # not produced yet; covered by the planned-contract test below
+            continue
         assert set(feature.requires) <= produced, f"{feature.id} requires tables the engine never writes"
+
+
+def test_planned_feature_tables_are_in_the_contract():
+    from cockpit_ui.core.contract import CONTRACT
+
+    for feature in discover().features:
+        if not feature.is_planned:
+            continue
+        for name in feature.requires:
+            assert name.lower() in CONTRACT, f"{feature.id}: planned table {name} is not in contract.CONTRACT"
+
+
+def test_existing_pages_metadata():
+    features = {f.id: f for f in discover().features}
+    expected = {
+        "overview": ("Overview", "F8", "live"),
+        "backlog": ("Waste", "F7", "preview"),
+        "utilization": ("Waste", "F5", "live"),
+        "tagging": ("Attribution", "F2", "live"),
+        "reliability": ("Operations", "F6", "live"),
+        "health": ("Platform", "F11", "live"),
+    }
+    for feature_id, (group, plan_id, status) in expected.items():
+        feature = features[feature_id]
+        assert (feature.group, feature.plan_id, feature.status) == (group, plan_id, status), feature_id
+        assert feature.description and "\n" not in feature.description
 
 
 # ---------------------------------------------------------------- settings

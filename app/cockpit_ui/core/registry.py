@@ -70,5 +70,14 @@ def enabled_features(features: list[Feature], toggles: dict[str, dict]) -> list[
     return sorted(selected, key=lambda f: (f.order, f.title))
 
 
+def group_features(features: list[Feature]) -> dict[str, list[Feature]]:
+    """Navigation sections: groups appear in the order of their first feature, features by ``order``."""
+
+    groups: dict[str, list[Feature]] = {}
+    for feature in sorted(features, key=lambda f: (f.order, f.title)):
+        groups.setdefault(feature.group, []).append(feature)
+    return groups
+
+
 def missing_tables(feature: Feature, available: set[str]) -> list[str]:
     return [table for table in feature.requires if table.lower() not in available]
