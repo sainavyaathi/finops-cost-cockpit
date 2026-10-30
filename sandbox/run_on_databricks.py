@@ -2,7 +2,8 @@
 # MAGIC %md
 # MAGIC # FinOps Accelerator — synthetic data run (works on Databricks Free Edition)
 # MAGIC
-# MAGIC 1. Creates synthetic copies of the System Tables in `workspace.finops_synthetic`
+# MAGIC 1. Creates synthetic copies of the nine System Tables in `workspace.finops_synthetic`
+# MAGIC    (the six the accelerator reads plus `compute.clusters`, `access.audit`, `query.history`)
 # MAGIC 2. Runs the **unmodified** `databricks_finops` pipeline, redirecting `system.*` reads to those tables
 # MAGIC 3. Writes outputs + dashboard views to `workspace.cockpit`
 # MAGIC
@@ -39,7 +40,8 @@ print("repo root:", REPO_ROOT)
 # COMMAND ----------
 
 for t in ["system.billing.usage", "system.billing.list_prices", "system.compute.node_timeline",
-          "system.lakeflow.jobs", "system.lakeflow.job_run_timeline", "system.lakeflow.job_task_run_timeline"]:
+          "system.lakeflow.jobs", "system.lakeflow.job_run_timeline", "system.lakeflow.job_task_run_timeline",
+          "system.compute.clusters", "system.access.audit", "system.query.history"]:
     try:
         n = spark.sql(f"SELECT COUNT(*) FROM {t}").collect()[0][0]
         print(f"OK       {t}: {n} rows")
