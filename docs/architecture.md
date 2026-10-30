@@ -49,6 +49,29 @@ cost + utilization + reliability + tagging + attribution
 
 `optimization_candidates` combines the model into a prioritized advisory review backlog.
 
+## Cockpit Tables
+
+Cockpit steps (`src/cockpit/steps/`) run after the upstream pipeline and write to the same cockpit schema (rule R4). They never modify upstream tables (rule R3).
+
+`cost_base` (F1, view) publishes `daily_cost` under the cockpit name.
+
+`job_reliability` (F6, Delta table, step `build_job_reliability`) is `job_reliability_summary` with a corrected retry count. Upstream groups `system.lakeflow.job_task_run_timeline` by `run_id`, which is the task run id, so its `retry_count` is always 0. This table counts retries and repair reruns:
+
+- Attempts per task are `COUNT(DISTINCT run_id)` per `(job_run_id, task_key)`; retries per job run are `attempts - 1` summed over its tasks. Distinct, because one long attempt spans several hourly rows. Rows with NULL `job_run_id` or `task_key` are ignored.
+- Only top-level task runs count (`parent_run_id` NULL or equal to `job_run_id`), so for-each iterations are not mistaken for retries. This assumes top-level tasks carry `parent_run_id = job_run_id` and iterations carry the for-each task run id; **confirm on real data**. If `parent_run_id` is absent, iterations cannot be excluded and the run log says so.
+- Only job runs present in `system.lakeflow.job_run_timeline` within the lookback are counted, so retries line up with `run_count`. The task timeline is read over lookback + 2 days so early attempts of runs near the edge are kept.
+- If either timeline is missing or lacks the needed columns, upstream values are kept (`retry_count_source = 'UPSTREAM_FALLBACK'`) and the run log says why.
+
+One row per `(workspace_id, job_id)`. Columns:
+
+- Same as upstream: `workspace_id`, `job_id`, `job_name`, `run_count`, `success_count`, `failed_count`, `cancelled_count`, `skipped_count`, `failure_rate_pct`, `avg_duration_minutes`, `total_duration_minutes`, `estimated_failed_dbus`, `estimated_failed_cost` (DECIMAL(38,6)), `last_run_start_time`, `last_run_result_state`, `confidence`, `created_at`, `run_id`.
+- `retry_count`: corrected task retries and repair reruns across all job runs.
+- `retried_run_count`: job runs with at least one retried task (NULL in fallback mode).
+- `retry_rate_pct`: `retried_run_count / run_count * 100`.
+- `upstream_retry_count`: the upstream value, kept for comparison.
+- `retry_count_source`: `TASK_TIMELINE_JOB_RUN_ID`, or `UPSTREAM_FALLBACK`.
+- `reliability_category`: upstream rules and order re-evaluated with the corrected `retry_count` (`retry_heavy_count`, `high_failure_rate_pct` from `config/thresholds.yml`). REVIEW_REQUIRED (a run with NULL final `result_state`) is recomputed from `job_run_timeline`; in fallback mode it is inherited from upstream. `upstream_reliability_category` keeps the original.
+
 ## Configurable Rules
 
 Business thresholds live in `config/thresholds.yml`:
