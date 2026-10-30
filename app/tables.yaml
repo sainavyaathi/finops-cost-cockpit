@@ -1,0 +1,17 @@
+# Logical -> physical table map (optional). Pages ask for logical names, e.g. vw_executive_summary.
+# Unmapped names resolve to <COCKPIT_CATALOG>.<COCKPIT_SCHEMA>.<logical name>.
+#
+# Values may be:
+#   table                    -> <COCKPIT_CATALOG>.<COCKPIT_SCHEMA>.table
+#   schema.table             -> <COCKPIT_CATALOG>.schema.table
+#   catalog.schema.table     -> as written
+# Each part: letters, digits, "_" or "-". Anything else is rejected.
+# Logical names are listed in app/cockpit_ui/core/contract.py.
+#
+# Example for an enterprise that keeps FinOps outputs in its own schemas:
+# tables:
+#   vw_executive_summary: finance_prod.finops_gold.exec_summary
+#   job_reliability_summary: platform.observability.job_reliability
+#   accelerator_run_log: finops_ops.run_log
+
+tables: {}

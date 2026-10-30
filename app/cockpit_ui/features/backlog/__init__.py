@@ -8,8 +8,11 @@ FEATURE = Feature(
     icon=":material/priority_high:",
     owner="Nikhil",
     plan_refs=("F7",),
+    plan_id="F7",
+    group="Waste",
+    status="preview",
     order=20,
     requires=("optimization_candidates",),
-    description="Ranked optimization backlog. Priority = 45% cost + 25% waste + 15% reliability + 10% tagging + 5% frequency.",
+    description="The ranked list of compute to fix, highest priority score first.",
     render=render,
 )

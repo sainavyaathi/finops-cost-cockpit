@@ -1,11 +1,26 @@
+# Databricks Apps entry point. See docs/connecting_workspaces.md.
 command: ["streamlit", "run", "streamlit_app.py"]
 
 env:
   - name: COCKPIT_SOURCE
     value: databricks
+  # Must match the catalog/schema the pipeline job writes (bundle variables catalog/schema, rule R4).
   - name: COCKPIT_CATALOG
     value: workspace
   - name: COCKPIT_SCHEMA
     value: cockpit
+  # Injected from the app's sql-warehouse resource (resources/cockpit_app.yml, permission CAN_USE).
   - name: DATABRICKS_WAREHOUSE_ID
     valueFrom: sql-warehouse
+  # app  = the app's service principal (needs USE CATALOG, USE SCHEMA, SELECT on the schema).
+  # user = on-behalf-of-user: queries run as the signed-in viewer with their own grants. Requires
+  #        user authorization enabled on the app with the "sql" scope; data is cached per user.
+  - name: COCKPIT_AUTH
+    value: app
+  - name: COCKPIT_QUERY_TIMEOUT
+    value: "300"
+  # Optional:
+  # - name: COCKPIT_MAX_ROWS        # cap rows per table read (LIMIT)
+  #   value: "200000"
+  # - name: COCKPIT_TABLE_MAP       # logical -> physical table map; app/tables.yaml is used if present
+  #   value: tables.yaml
