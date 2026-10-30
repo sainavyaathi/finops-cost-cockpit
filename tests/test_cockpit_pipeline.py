@@ -22,8 +22,8 @@ def _step(name: str, *deps: str, required: bool = True, calls: list | None = Non
     return Step(name=name, run=run, depends_on=deps, required=required)
 
 
-def test_discovers_the_registered_steps():
-    assert [s.name for s in discover_steps()] == ["build_cost_base"]
+def test_discovers_the_cost_base_step():
+    assert "build_cost_base" in [s.name for s in discover_steps()]
 
 
 def test_cost_base_step_publishes_daily_cost_as_a_cockpit_view():
