@@ -24,7 +24,7 @@ SELECT
     ) AS detail,
     'access.audit' AS source
 FROM system.access.audit a
-WHERE a.event_date >= current_date() - INTERVAL {lookback_days} DAYS
+WHERE a.event_date >= current_date() - INTERVAL {detection_days} DAYS
   AND a.request_params['clusterId'] IS NOT NULL
   AND a.user_agent RLIKE {bi_client_regex}
   AND COALESCE(a.response.status_code, 200) < 400

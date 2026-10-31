@@ -1,7 +1,7 @@
     -- Utilisation per cluster and clock hour (session time zone, UTC on Databricks) across all its
     -- nodes, with the same CPU (user + system) and memory metrics as compute_utilization_summary
     -- (driver and workers averaged together, like upstream). The window starts at midnight of
-    -- current_date - lookback, the same as daily_cost (usage_date >= current_date - lookback).
+    -- current_date - detection_days, the same days as the cost (usage_date >= current_date - detection_days).
     -- sampled_minutes weights the hour: a cluster seen for 3 minutes of an hour counts 3/60 of an hour.
     SELECT
         CAST(workspace_id AS STRING) AS workspace_id,
@@ -15,6 +15,6 @@
         SUM({memory_expr}) AS memory_sum,
         COUNT({memory_expr}) AS memory_samples
     FROM system.compute.node_timeline
-    WHERE start_time >= CAST(current_date() - INTERVAL {lookback_days} DAYS AS TIMESTAMP)
+    WHERE start_time >= CAST(current_date() - INTERVAL {detection_days} DAYS AS TIMESTAMP)
       AND cluster_id IS NOT NULL
     GROUP BY CAST(workspace_id AS STRING), CAST(cluster_id AS STRING), date_trunc('HOUR', start_time)

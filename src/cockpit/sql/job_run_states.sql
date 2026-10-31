@@ -11,7 +11,7 @@ FROM (
         run_id,
         MAX_BY(result_state, period_end_time) AS result_state
     FROM system.lakeflow.job_run_timeline
-    WHERE period_start_time >= current_timestamp() - INTERVAL {lookback_days} DAYS
+    WHERE period_start_time >= current_timestamp() - INTERVAL {detection_days} DAYS
     GROUP BY 1, 2, 3
 ) terminal_runs
 GROUP BY workspace_id, job_id

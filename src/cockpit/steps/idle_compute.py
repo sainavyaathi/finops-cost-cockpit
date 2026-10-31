@@ -16,9 +16,13 @@ A cluster is flagged when BOTH hold:
 
 ``CONFIG_FLAG_REQUIRES_IDLE`` switches the rule to "the setting is the finding, idleness adds evidence".
 
-Money: ``idle_cost = estimated_cost * idle_minutes / active_minutes`` (lookback cost from daily_cost, spread
-evenly over active hours); ``estimated_monthly_savings = idle_cost * 30 / lookback_days``, an upper bound
-that never exceeds the cluster's own cost.
+Window: cost and utilisation cover the shared detection window ``min(detection.detection_days,
+lookback_days)`` (``cockpit.step_config.detection_window``), so a long upstream lookback does not dilute
+the flags. ``daily_cost`` is filtered to the same days.
+
+Money: ``idle_cost = estimated_cost * idle_minutes / active_minutes`` (detection-window cost from daily_cost,
+spread evenly over active hours); ``estimated_monthly_savings = idle_cost * 30 / detection_days``, an upper
+bound that never exceeds the cluster's own cost.
 
 Degraded modes (decided by probing the source tables, not by failing):
 
@@ -38,7 +42,7 @@ from typing import Any
 from databricks_finops.spark_utils import sql_string
 
 from cockpit.pipeline import Step, StepContext
-from cockpit.step_config import load_step_thresholds
+from cockpit.step_config import DetectionWindow, detection_window, load_step_thresholds
 
 # Thresholds: section ``idle_compute:`` of config/cockpit_thresholds.yml (see cockpit.step_config).
 # The low-utilisation pair (low_cpu_pct, low_memory_pct) comes from upstream thresholds.yml instead.
@@ -171,12 +175,14 @@ def build_idle_compute_sql(
     node_problem: str | None,
     thresholds: IdleComputeThresholds | None = None,
     config_flag_requires_idle: bool = CONFIG_FLAG_REQUIRES_IDLE,
+    window: DetectionWindow | None = None,
 ) -> tuple[str, str]:
     """Return (CREATE statement, detection mode) for the probed source tables."""
 
     t = thresholds or IdleComputeThresholds()
     upstream = ctx.config.thresholds
-    lookback = str(ctx.config.lookback_days)
+    window = window or detection_window(ctx.config.bundle_root, ctx.config.lookback_days)
+    days = str(window.days)
 
     config_known = cluster_problem is None
     cpu = cpu_expr(node_columns)
@@ -195,7 +201,7 @@ def build_idle_compute_sql(
     if utilization_known:
         memory = f"CAST({MEMORY_COLUMN} AS DOUBLE)" if MEMORY_COLUMN in node_columns else "CAST(NULL AS DOUBLE)"
         node_hours_sql = ctx.sql("idle_compute_node_hours", cpu_expr=cpu, memory_expr=memory,
-                                 lookback_days=lookback).rstrip()
+                                 detection_days=days).rstrip()
     else:
         node_hours_sql = _EMPTY_NODE_HOURS
 
@@ -221,8 +227,9 @@ def build_idle_compute_sql(
         config_score_off=_num(t.config_score_off),
         config_score_too_long=_num(t.config_score_too_long),
         config_score_unknown=_num(t.config_score_unknown),
-        monthly_multiplier=_num(30.0 / ctx.config.lookback_days),
-        lookback_days=lookback,
+        monthly_multiplier=_num(window.monthly_multiplier),
+        detection_days=days,
+        lookback_days=str(ctx.config.lookback_days),
         currency_code_sql=sql_string(ctx.config.currency_code),
     )
     return statement, detection_mode(config_known, utilization_known)
@@ -230,13 +237,15 @@ def build_idle_compute_sql(
 
 def build(ctx: StepContext) -> str:
     thresholds, warnings = load_idle_compute_thresholds(ctx.config.bundle_root)
+    window = detection_window(ctx.config.bundle_root, ctx.config.lookback_days)
+    warnings = tuple(warnings) + window.warnings
     cluster_columns, cluster_problem = probe_table(ctx.spark, CLUSTERS, REQUIRED_CLUSTER_COLUMNS)
     node_columns, node_problem = probe_table(ctx.spark, NODE_TIMELINE, REQUIRED_NODE_COLUMNS)
     if node_problem is None and cpu_expr(node_columns) is None:
         node_problem = f"{NODE_TIMELINE} has no CPU columns"
 
     statement, mode = build_idle_compute_sql(ctx, cluster_columns, cluster_problem,
-                                             node_columns, node_problem, thresholds)
+                                             node_columns, node_problem, thresholds, window=window)
     ctx.spark.sql(statement)
 
     notes = [p for p in (cluster_problem, node_problem) if p]
@@ -248,6 +257,7 @@ def build(ctx: StepContext) -> str:
         message = "idle_compute built from utilisation only (LOW confidence); auto-termination not checked"
     else:
         message = "idle_compute built from auto-termination only (LOW confidence); idle cost unknown"
+    message += f" over {window.days} day(s)"
     if notes:
         message += " (" + "; ".join(notes) + ")"
     if warnings:

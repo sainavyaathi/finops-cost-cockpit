@@ -25,7 +25,7 @@ runs AS (
         MAX({run_type_column}) AS run_type,
         MAX(run_name) AS run_name
     FROM system.lakeflow.job_run_timeline
-    WHERE period_start_time >= current_date() - INTERVAL {lookback_days} DAYS
+    WHERE period_start_time >= current_date() - INTERVAL {detection_days} DAYS
     GROUP BY workspace_id, job_id, run_id
 ),
 classified AS (
@@ -71,7 +71,7 @@ run_compute AS (
     SELECT DISTINCT t.workspace_id, t.job_id, t.run_id, cid AS cluster_id
     FROM system.lakeflow.job_run_timeline t
     LATERAL VIEW explode(t.compute_ids) run_compute_ids AS cid
-    WHERE t.period_start_time >= current_date() - INTERVAL {lookback_days} DAYS
+    WHERE t.period_start_time >= current_date() - INTERVAL {detection_days} DAYS
       AND cid IS NOT NULL
 ),
 task_compute AS (

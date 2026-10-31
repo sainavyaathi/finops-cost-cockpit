@@ -10,6 +10,6 @@ SELECT
     MAX(t.period_end_time) AS activity_end
 FROM system.lakeflow.job_task_run_timeline t
 LATERAL VIEW explode(t.compute_ids) task_compute AS cid
-WHERE t.period_start_time >= current_date() - INTERVAL {lookback_days} DAYS
+WHERE t.period_start_time >= current_date() - INTERVAL {detection_days} DAYS
   AND cid IS NOT NULL
 GROUP BY t.workspace_id, t.job_id, t.job_run_id, t.run_id, cid

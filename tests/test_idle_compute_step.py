@@ -410,7 +410,8 @@ def boundaries(sandbox):
             for m in range(minutes):
                 t = base + timedelta(hours=h, minutes=m)
                 nodes.append(("w1", cluster_id, t, t + timedelta(minutes=1), cpu * 0.8, cpu * 0.2, mem))
-        cost.append(("w1", cluster_id, 10.0, None, "PREMIUM_ALL_PURPOSE_COMPUTE", "ALL_PURPOSE", None, "run-1"))
+        cost.append(("w1", cluster_id, 10.0, None, "PREMIUM_ALL_PURPOSE_COMPUTE", "ALL_PURPOSE", None, "run-1",
+                     base.date()))
 
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {FIXTURE}")
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS spark_catalog.{FIXTURE_SCHEMA}")
@@ -423,7 +424,8 @@ def boundaries(sandbox):
                           "mem_used_percent double") \
         .write.format("delta").mode("overwrite").saveAsTable(f"{FIXTURE}.node_timeline")
     spark.createDataFrame(cost, "workspace_id string, cluster_id string, estimated_cost double, owner string, "
-                          "sku_name string, billing_origin_product string, job_id string, run_id string") \
+                          "sku_name string, billing_origin_product string, job_id string, run_id string, "
+                          "usage_date date") \
         .write.format("delta").mode("overwrite").saveAsTable(f"spark_catalog.{FIXTURE_SCHEMA}.daily_cost")
 
     class Redirect:

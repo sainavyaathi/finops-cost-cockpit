@@ -17,7 +17,7 @@ SELECT
     ) AS detail,
     'query.history' AS source
 FROM system.query.history q
-WHERE q.start_time >= current_date() - INTERVAL {lookback_days} DAYS
+WHERE q.start_time >= current_date() - INTERVAL {detection_days} DAYS
   AND q.compute.cluster_id IS NOT NULL
   -- Cluster compute only: warehouse and serverless statements are the right place for BI traffic.
   AND UPPER(COALESCE(q.compute.type, '')) NOT IN ('WAREHOUSE', 'SERVERLESS_COMPUTE')

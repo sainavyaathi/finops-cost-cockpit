@@ -17,6 +17,10 @@ ALL_PURPOSE billing SKU when the cluster is not in ``compute.clusters``):
 Each signal is independent. A missing source table skips only the signals that need it, and the
 skip is reported in the run-log message. Thresholds come from the ``allpurpose_misuse`` section of
 ``config/cockpit_thresholds.yml`` (see ``cockpit.step_config``).
+
+Every source (billing, audit, query history, job runs) is read over the shared detection window
+``min(detection.detection_days, lookback_days)`` (``cockpit.step_config.detection_window``), and
+monthly figures are scaled by ``30 / detection_days``.
 """
 
 from __future__ import annotations
@@ -24,7 +28,7 @@ from __future__ import annotations
 from typing import Any
 
 from cockpit.pipeline import Step, StepContext
-from cockpit.step_config import enforce_bounds, load_step_lists, load_step_thresholds
+from cockpit.step_config import DetectionWindow, detection_window, enforce_bounds, load_step_lists, load_step_thresholds
 from databricks_finops.spark_utils import sql_string
 
 SECTION = "allpurpose_misuse"
@@ -175,11 +179,13 @@ def build_statement(
     available: dict[str, bool],
     thresholds: dict[str, float],
     lists: dict[str, tuple[str, ...]] | None = None,
+    window: DetectionWindow | None = None,
 ) -> tuple[str, list[str]]:
     """Compose the CREATE TABLE statement for the available sources. Returns (sql, notes)."""
 
-    lookback = str(ctx.config.lookback_days)
-    common = {"lookback_days": lookback, "bi_client_regex": sql_string(BI_CLIENT_REGEX)}
+    window = window or detection_window(ctx.config.bundle_root, ctx.config.lookback_days)
+    days = str(window.days)
+    common = {"detection_days": days, "bi_client_regex": sql_string(BI_CLIENT_REGEX)}
     notes: list[str] = []
     triggers, run_types, count_retries, rule_notes = automation_rules(lists or LIST_DEFAULTS)
     notes += rule_notes
@@ -233,13 +239,13 @@ def build_statement(
         scheduled = ctx.sql(
             "allpurpose_misuse_scheduled_jobs",
             jobs_relation=jobs,
-            task_compute_relation=ctx.sql("allpurpose_misuse_task_compute", lookback_days=lookback),
+            task_compute_relation=ctx.sql("allpurpose_misuse_task_compute", detection_days=days),
             run_type_column="run_type" if available.get("job_run_type") else "CAST(NULL AS STRING)",
             trigger_test=in_test("c.effective_trigger", triggers),
             run_type_test=in_test("c.run_type", run_types),
             job_trigger_test=in_test("c.job_trigger", triggers),
             count_retries="TRUE" if count_retries else "FALSE",
-            lookback_days=lookback,
+            detection_days=days,
         )
 
     statement = ctx.sql(
@@ -253,7 +259,8 @@ def build_statement(
         scheduled_signal=scheduled,
         shared_signal=shared,
         all_purpose_sources=sql_list(ALL_PURPOSE_SOURCES),
-        lookback_days=lookback,
+        detection_days=days,
+        lookback_days=str(ctx.config.lookback_days),
         fallback_dbu_price=num(ctx.config.fallback_dbu_price),
         currency_code_sql=sql_string(ctx.config.currency_code),
         run_id_sql=sql_string(ctx.run_id),
@@ -264,8 +271,10 @@ def build_statement(
 
 def build(ctx: StepContext) -> str:
     thresholds, lists, warnings = load_settings(ctx.config.bundle_root)
+    window = detection_window(ctx.config.bundle_root, ctx.config.lookback_days)
+    warnings += list(window.warnings)
     available = probe_sources(ctx.spark)
-    statement, notes = build_statement(ctx, available, thresholds, lists)
+    statement, notes = build_statement(ctx, available, thresholds, lists, window)
     ctx.spark.sql(statement)
 
     counts = {t: 0 for t in MISUSE_TYPES}
@@ -275,7 +284,7 @@ def build(ctx: StepContext) -> str:
         for misuse_type in row[0] or []:
             counts[misuse_type] = counts.get(misuse_type, 0) + 1
     summary = ", ".join(f"{t} {n}" for t, n in counts.items())
-    message = f"allpurpose_misuse: {clusters} cluster(s) flagged ({summary})"
+    message = f"allpurpose_misuse: {clusters} cluster(s) flagged ({summary}) over {window.days} day(s)"
     extra = notes + warnings
     return message + ("; " + "; ".join(extra) if extra else "")
 

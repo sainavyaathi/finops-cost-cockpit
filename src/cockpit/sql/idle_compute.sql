@@ -4,7 +4,9 @@ CREATE OR REPLACE TABLE {target}
 USING DELTA
 AS
 WITH cluster_cost AS (
-    -- Cost in the lookback window, from the engine daily_cost (DBUs x list price, upstream pattern).
+    -- Cost in the detection window, from the engine daily_cost (DBUs x list price, upstream pattern).
+    -- daily_cost covers the upstream lookback; the date filter keeps only the detection window
+    -- (identical when detection_days = lookback_days).
     SELECT
         CAST(workspace_id AS STRING) AS workspace_id,
         CAST(cluster_id AS STRING) AS cluster_id,
@@ -19,6 +21,7 @@ WITH cluster_cost AS (
         MAX(CASE WHEN job_id IS NOT NULL THEN 1 ELSE 0 END) AS billed_to_job
     FROM {daily_cost_table}
     WHERE run_id = {run_id_sql}
+      AND usage_date >= current_date() - INTERVAL {detection_days} DAYS
       AND cluster_id IS NOT NULL
     GROUP BY CAST(workspace_id AS STRING), CAST(cluster_id AS STRING)
 ),
@@ -86,7 +89,7 @@ flagged AS (
     -- config_flag_requires_idle TRUE (current rule, AND): the cluster must also be mostly idle, so a
     --   busy or memory-bound cluster is not flagged.
     -- config_flag_requires_idle FALSE (OR variant): the setting alone is the finding when the cluster
-    --   had cost in the lookback; idleness only adds evidence, savings and priority.
+    --   had cost in the detection window; idleness only adds evidence, savings and priority.
     -- Configuration unknown: flag on idleness alone. Utilisation unknown: flag on the setting alone.
     SELECT
         *,
@@ -185,9 +188,10 @@ SELECT
                 THEN concat('avg CPU ', format_number(avg_cpu_pct, 1), '%, memory ',
                             COALESCE(concat(format_number(avg_memory_pct, 1), '%'), 'n/a'))
         END,
-        concat(format_number(estimated_cost, 2), ' ', {currency_code_sql}, ' over {lookback_days} days')
+        concat(format_number(estimated_cost, 2), ' ', {currency_code_sql}, ' over {detection_days} days')
     ) AS STRING) AS evidence,
     CAST({lookback_days} AS INT) AS lookback_days,
+    CAST({detection_days} AS INT) AS detection_days,
     current_timestamp() AS created_at,
     {run_id_sql} AS run_id
 FROM costed

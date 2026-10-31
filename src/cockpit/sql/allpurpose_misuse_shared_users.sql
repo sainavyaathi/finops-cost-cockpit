@@ -14,7 +14,7 @@ SELECT
     CAST(NULL AS STRING) AS detail,
     'access.audit' AS source
 FROM system.access.audit a
-WHERE a.event_date >= current_date() - INTERVAL {lookback_days} DAYS
+WHERE a.event_date >= current_date() - INTERVAL {detection_days} DAYS
   AND a.service_name = 'notebook'
   AND a.action_name = 'attachNotebook'
   AND a.request_params['clusterId'] IS NOT NULL

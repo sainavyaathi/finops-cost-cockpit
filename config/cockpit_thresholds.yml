@@ -2,6 +2,12 @@
 # config/thresholds.yml stays the upstream engine's file (its sections are pinned by tests);
 # each cockpit step gets its own section here. Missing keys fall back to the step's code defaults.
 
+# Shared detection window for F4, F5, F6 and F7 (src/cockpit/step_config.py detection_window).
+# The steps look at min(detection_days, upstream --lookback-days) days, so a long upstream lookback
+# for trends (e.g. 180 days) does not dilute the waste flags. Monthly figures = window amount x 30 / days.
+detection:
+  detection_days: 30
+
 allpurpose_misuse:              # F4: cockpit.allpurpose_misuse
   min_interactive_users: 3      # SHARED_USERS: distinct users attaching notebooks to one cluster
   min_bi_events: 5              # BI_TOOL_JDBC: JDBC/ODBC requests on one cluster in the lookback
@@ -37,3 +43,25 @@ idle_compute:
   config_score_off: 100                 # config score: auto-termination off
   config_score_too_long: 60             # config score: auto-termination above the limit
   config_score_unknown: 50              # config score: compute.clusters unavailable
+
+# F7: cockpit.waste_flags (code defaults: DEFAULTS in src/cockpit/steps/waste_flags.py).
+# One common 0-100 priority for every source, so the F10 alert can take the top 3 (rule R5):
+#   priority_score = (w_savings * S + w_cost * C + w_breadth * B) * confidence multiplier, capped 0-100
+#   S = min(100, monthly savings / score_reference_monthly_savings * 100)
+#   C = min(100, monthly cost / score_reference_monthly_cost * 100)
+#   B = min(100, (distinct flag types on the resource - 1) * breadth_points_per_extra_flag)
+waste_flags:
+  score_reference_monthly_savings: 1000   # monthly saving that scores 100; must be > 0
+  score_reference_monthly_cost: 1000      # monthly cost that scores 100; must be > 0
+  priority_weight_savings: 0.6            # the three priority weights must add up to 1.0
+  priority_weight_cost: 0.3
+  priority_weight_breadth: 0.1
+  breadth_points_per_extra_flag: 50
+  confidence_multiplier_high: 1.0
+  confidence_multiplier_medium: 0.85
+  confidence_multiplier_low: 0.7          # also used when confidence is unknown
+  # Upstream optimization_candidates issue types taken into the backlog (UPPERCASE, comma-separated).
+  # RETRY_HEAVY is never taken (upstream retry_count is always 0, see F6); HIGH_FAILURE_COST and
+  # HIGH_FAILURE_RATE are dropped while cockpit.job_reliability is readable (F6 supersedes them);
+  # SHARED_CLUSTER_ATTRIBUTION is dropped for clusters that F4 or F5 already flag.
+  upstream_issue_types: HIGH_COST_LOW_UTILIZATION, LOW_UTILIZATION, EXPENSIVE_WORKLOAD, MISSING_TAGS, UNKNOWN_ATTRIBUTION, SHARED_CLUSTER_ATTRIBUTION, HIGH_FAILURE_COST, HIGH_FAILURE_RATE

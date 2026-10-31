@@ -12,11 +12,61 @@ malformed file behaves the same way: code defaults are used and a warning is ret
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from databricks_finops.config import _numeric_section, _read_yaml_file
 
 THRESHOLDS_FILE = Path("config") / "cockpit_thresholds.yml"
+
+DETECTION_SECTION = "detection"
+DETECTION_DEFAULTS: dict[str, float] = {"detection_days": 30}
+
+
+@dataclass(frozen=True)
+class DetectionWindow:
+    """The window the cockpit detection steps (F4, F5, F6, F7) look at.
+
+    ``days = min(detection_days, lookback_days)``: the upstream engine may read a long lookback for
+    trends (for example 180 days), but waste flags must reflect recent behaviour, so they never look
+    further back than ``detection_days``. The window is never wider than the upstream lookback,
+    because the upstream tables the steps build on only hold that much.
+    """
+
+    days: int
+    configured_days: int
+    lookback_days: int
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def narrowed(self) -> bool:
+        """True when detection looks at fewer days than the upstream lookback."""
+        return self.days < self.lookback_days
+
+    @property
+    def monthly_multiplier(self) -> float:
+        """Scale a detection-window amount to 30 days."""
+        return 30.0 / self.days
+
+
+def detection_window(bundle_root: str, lookback_days: int) -> DetectionWindow:
+    """Read ``detection.detection_days`` (default 30) and clamp it to the upstream lookback.
+
+    This is the one loader every detection step uses, so all of them agree on the window. A value
+    that is not a whole number of at least 1 falls back to the default with a warning.
+    """
+
+    values, warnings = load_step_thresholds(bundle_root, DETECTION_SECTION, DETECTION_DEFAULTS)
+    raw = values["detection_days"]
+    default = int(DETECTION_DEFAULTS["detection_days"])
+    if raw < 1 or raw != int(raw):
+        warnings.append(f"{DETECTION_SECTION}.detection_days={raw:g} must be a whole number >= 1; "
+                        f"default {default} used.")
+        raw = default
+    configured = int(raw)
+    lookback = max(1, int(lookback_days))
+    return DetectionWindow(days=min(configured, lookback), configured_days=configured,
+                           lookback_days=lookback, warnings=tuple(warnings))
 
 
 def load_step_thresholds(

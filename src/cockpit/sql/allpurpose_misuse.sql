@@ -37,14 +37,14 @@ cluster_usage AS (
     LEFT JOIN listed_all_purpose l
         ON u.workspace_id = l.workspace_id
         AND u.usage_metadata.cluster_id = l.cluster_id
-    WHERE u.usage_date >= current_date() - INTERVAL {lookback_days} DAYS
+    WHERE u.usage_date >= current_date() - INTERVAL {detection_days} DAYS
       AND u.usage_unit = 'DBU'
       AND u.usage_metadata.cluster_id IS NOT NULL
       AND (u.sku_name LIKE '%ALL_PURPOSE%' OR l.cluster_id IS NOT NULL)
 ),
 -- Cost = DBUs x list price joined on SKU and the effective window of the price, with the configured
 -- fallback DBU price for unmatched rows. KEEP IN STEP with upstream
--- engine template sql/daily_cost_list_prices.sql (price precedence, join keys, lookback filter),
+-- engine template sql/daily_cost_list_prices.sql (price precedence, join keys; the date filter here is the detection window),
 -- so cluster_cost matches cost_base; a test compares the two.
 -- job_compute_cost prices the same DBUs (assumed unchanged) at the matching jobs SKU
 -- (ALL_PURPOSE -> JOBS) for the SCHEDULED_JOB saving.
@@ -281,7 +281,7 @@ per_type AS (
             WHEN 'SHARED_USERS' THEN ap.cluster_cost
             ELSE COALESCE(tc.attributable_cost, 0.0)
         END AS attributable_cost,
-        -- Candidate saving over the lookback window, before the R1 per-cluster deduplication.
+        -- Candidate saving over the detection window, before the R1 per-cluster deduplication.
         CASE f.misuse_type
             WHEN 'SCHEDULED_JOB' THEN COALESCE(tc.job_compute_saving, 0.0)
             WHEN 'BI_TOOL_JDBC' THEN COALESCE(tc.attributable_cost, 0.0) * {bi_to_sql_warehouse_savings_pct} / 100.0
@@ -342,7 +342,7 @@ per_cluster AS (
         MAX(CASE WHEN type_rank = 1 THEN type_basis END) AS primary_basis,
         concat_ws(', ', transform(
             array_sort(collect_list(CASE WHEN type_rank > 1 THEN named_struct('r', type_rank, 'v', CONCAT(
-                misuse_type, ' ', CAST(ROUND(candidate_saving * 30.0 / {lookback_days}, 2) AS STRING)))
+                misuse_type, ' ', CAST(ROUND(candidate_saving * 30.0 / {detection_days}, 2) AS STRING)))
             END)),
             x -> x.v)) AS other_candidates,
         MAX(CASE WHEN type_rank = 1 THEN candidate_saving END) AS kept_saving,
@@ -364,9 +364,9 @@ scored AS (
         ap.cluster_source,
         COALESCE(ap.owned_by, o.owner) AS owner,
         ap.cluster_cost,
-        ap.cluster_cost * 30.0 / {lookback_days} AS monthly_cost,
+        ap.cluster_cost * 30.0 / {detection_days} AS monthly_cost,
         -- R1: one saving per cluster (the largest candidate), never above the cost of the cluster.
-        LEAST(ap.cluster_cost, pc.kept_saving) * 30.0 / {lookback_days} AS monthly_saving
+        LEAST(ap.cluster_cost, pc.kept_saving) * 30.0 / {detection_days} AS monthly_saving
     FROM per_cluster pc
     JOIN all_purpose ap
         ON pc.workspace_id = ap.workspace_id
@@ -391,6 +391,7 @@ SELECT
     CAST(COALESCE(scheduled_run_count, 0) AS BIGINT) AS scheduled_run_count,
     CAST(COALESCE(interactive_user_count, 0) AS BIGINT) AS interactive_user_count,
     CAST({lookback_days} AS INT) AS lookback_days,
+    CAST({detection_days} AS INT) AS detection_days,
     CAST(ROUND(cluster_cost, 6) AS DECIMAL(38,6)) AS cluster_cost,
     CAST(ROUND(COALESCE(bi_tool_attributable_cost, 0.0), 6) AS DECIMAL(38,6)) AS bi_tool_attributable_cost,
     CAST(ROUND(COALESCE(scheduled_job_attributable_cost, 0.0), 6) AS DECIMAL(38,6)) AS scheduled_job_attributable_cost,
