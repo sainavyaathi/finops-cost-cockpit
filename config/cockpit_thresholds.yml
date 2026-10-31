@@ -1,0 +1,24 @@
+# Thresholds for cockpit plug-in steps (src/cockpit/steps), read by src/cockpit/step_config.py.
+# config/thresholds.yml stays the upstream engine's file (its sections are pinned by tests);
+# each cockpit step gets its own section here. Missing keys fall back to the step's code defaults.
+
+allpurpose_misuse:              # F4: cockpit.allpurpose_misuse
+  min_interactive_users: 3      # SHARED_USERS: distinct users attaching notebooks to one cluster
+  min_bi_events: 5              # BI_TOOL_JDBC: JDBC/ODBC requests on one cluster in the lookback
+  min_scheduled_runs: 2         # SCHEDULED_JOB: automated job runs on one cluster
+  # SCHEDULED_JOB covers every automated run (UPPERCASE identifiers, comma-separated):
+  # a run counts when its trigger_type (the job trigger_type when the run has none) is listed, or
+  # its run_type is listed. ONETIME_RETRY counts only for jobs that are automated (see docs).
+  # A manual "Run now" (trigger ONETIME, run_type JOB_RUN) is never counted.
+  automated_trigger_types: CRON, PERIODIC, CONTINUOUS, FILE_ARRIVAL, TABLE, ONETIME_RETRY
+  automated_run_types: SUBMIT_RUN      # external orchestrators (ADF, Airflow, API runs/submit)
+  use_query_history: 1          # 0 skips the query.history BI_TOOL_JDBC source
+  bi_to_sql_warehouse_savings_pct: 30   # assumed saving on BI-hour usage after moving to a SQL warehouse
+  jobs_price_ratio_fallback: 0.3        # jobs/all-purpose DBU price ratio when list_prices has no jobs SKU
+  score_reference_monthly_cost: 1000    # monthly cost or saving that scores 100; must be > 0
+  priority_weight_savings: 0.5
+  priority_weight_cost: 0.3
+  priority_weight_breadth: 0.2          # share of the three misuse types present on the cluster
+  confidence_multiplier_high: 1.0
+  confidence_multiplier_medium: 0.85
+  confidence_multiplier_low: 0.7

@@ -143,3 +143,49 @@ Derived lookback-window tables use `CREATE OR REPLACE TABLE`, so reruns determin
 `system.billing.usage` is required and fails fast if unavailable.
 
 Optional sources create WARN health rows and placeholder outputs with `INSUFFICIENT_DATA`, keeping downstream views queryable.
+
+## Cockpit Tables
+
+Cockpit plug-in steps (`src/cockpit/steps/`) run after the upstream pipeline and write to the same cockpit schema (rule R4). Their thresholds live in `config/cockpit_thresholds.yml`, one section per step (`config/thresholds.yml` stays the engine's file). Extra sources the steps read: `system.compute.clusters`, `system.access.audit`, `system.query.history`. Each step probes them and degrades, it does not fail, when one is missing.
+
+### `cost_base` (F1)
+
+A view over `daily_cost`, so cockpit steps and pages build on a cockpit name.
+
+### `allpurpose_misuse` (F4)
+
+Step `build_allpurpose_misuse` (depends on `build_cost_base`). It finds all-purpose clusters doing work that cheaper compute should do. **There is one row per cluster** with at least one misuse type, so `SUM(estimated_monthly_savings)` never counts a cluster twice (rule R1).
+
+All-purpose means `compute.clusters.cluster_source` is `UI` or `API`, using the latest `change_time` row. A cluster that is missing from `compute.clusters` (for example on Free Edition, where the table is empty) counts when billing shows an `ALL_PURPOSE` SKU.
+
+| Misuse type | Signal | Threshold | Candidate saving | Confidence |
+|---|---|---|---|---|
+| `BI_TOOL_JDBC` | `access.audit` events whose `user_agent` is a BI or JDBC/ODBC client and whose `request_params.clusterId` names the cluster. Also `query.history` statements on `compute.cluster_id` (excluding `compute.type` WAREHOUSE / SERVERLESS_COMPUTE) with a JDBC/ODBC `client_driver` or a BI `client_application`; `use_query_history: 0` switches this source off. Hours are cut in UTC. | `min_bi_events` | `bi_to_sql_warehouse_savings_pct` of the usage that overlaps hours with BI activity (an assumed saving from a SQL warehouse) | LOW from audit, because the clusterId link is an assumption (see `sandbox/README.md`); MEDIUM from query.history |
+| `SCHEDULED_JOB` | Automated runs whose `compute_ids` include the cluster. A run is automated when its `trigger_type` is in `automated_trigger_types` (default CRON, PERIODIC, CONTINUOUS, FILE_ARRIVAL, TABLE; the job trigger is used only when the run has none), when its `run_type` is in `automated_run_types` (default SUBMIT_RUN, the runs that ADF, Airflow and other orchestrators submit), or when it is an ONETIME_RETRY of a job that is automated. `job_run_timeline` does not link a retry to its original run, so this last test is made per job. A manual run (trigger ONETIME, run_type JOB_RUN) never counts. The lists must be UPPERCASE identifiers, and anything else falls back to the default with a warning. Billing has no `job_id` for these runs. Without `job_task_run_timeline` the type is skipped, because run-level `compute_ids` does not reliably list existing all-purpose clusters. | `min_scheduled_runs` | The usage that overlaps the run (task) windows, minus hours with interactive use (any BI request or notebook attach on the cluster, even below the thresholds), repriced at the jobs SKU (`ALL_PURPOSE` to `JOBS` in `list_prices`) with DBUs assumed unchanged. `jobs_price_ratio_fallback` applies when that SKU has no price. | HIGH |
+| `SHARED_USERS` | Distinct `user_identity.email` on `notebook.attachNotebook` events for the cluster. Billing `run_as` is usually empty on all-purpose compute, and `runCommand` is logged only in verbose audit logs. | `min_interactive_users` | None. This is an attribution and cluster-policy issue. | MEDIUM |
+
+How cost and savings are calculated:
+
+- **Cost.** DBUs are multiplied by the list price, joined on SKU and the effective window of the price, as in `daily_cost`. Unmatched rows use the fallback DBU price. Only billing rows of all-purpose candidates are priced. The join must stay in step with `daily_cost_list_prices.sql`, and a test compares `cluster_cost` with `cost_base`.
+- **Config checks.** Divisors (`score_reference_monthly_cost`) must be greater than 0, minimum counts at least 1, the percentage between 0 and 100 and the ratio between 0 and 1. A value outside its range falls back to the default with a warning in the run log.
+- **Attributed cost.** The activity windows of each type are merged into disjoint islands. Each billing row is then attributed by the share of its duration that overlaps an island, capped at 100%.
+- **Monthly figures.** Lookback amounts are scaled by `30 / lookback_days`.
+- **One saving per cluster (R1).** `estimated_monthly_savings` is the largest candidate saving, capped at the cost of the cluster. `misuse_type` is the type that produced it. The remaining types stay in `misuse_types` and `evidence`, and their candidate savings are listed in `savings_basis` as "not added".
+
+Columns:
+
+| Column | Meaning |
+|---|---|
+| `workspace_id`, `cluster_id`, `cluster_name`, `cluster_source`, `owner` | The cluster. `owner` is `compute.clusters.owned_by`, or the owner tag from `cost_base` when that is empty. |
+| `misuse_type` | The primary type: the one with the largest candidate saving. Ties go to SCHEDULED_JOB, then BI_TOOL_JDBC, then SHARED_USERS. |
+| `misuse_types` (`ARRAY<STRING>`), `misuse_type_count` | Every type found, primary first. |
+| `evidence` | One clause per type, for example client drivers and request counts, job names and triggers, or the user list. |
+| `bi_client_count`, `bi_event_count`, `scheduled_job_count`, `scheduled_run_count`, `interactive_user_count` | Signal counts in the lookback window (0 when that type is not present). |
+| `lookback_days`, `cluster_cost` | The lookback window and the cost of the cluster within it. |
+| `bi_tool_attributable_cost`, `scheduled_job_attributable_cost` | Lookback cost overlapping BI hours or scheduled runs. These are costs, not savings. |
+| `estimated_monthly_cost`, `estimated_monthly_savings` (`DECIMAL(38,6)`) | Monthly cluster cost, and the deduplicated saving (R1). This is the only savings column to sum. |
+| `savings_basis` | How the saving was derived, and which candidates were not added. |
+| `suggested_action` | `MOVE_TO_JOB_COMPUTE`, `MOVE_BI_TO_SQL_WAREHOUSE` or `APPLY_SHARED_CLUSTER_POLICY`. |
+| `confidence` | The confidence of the primary type. |
+| `priority_score` | 0-100. A weighted sum of a savings score, a cost score (both `LEAST(100, monthly / score_reference_monthly_cost * 100)`) and a breadth score (`misuse_type_count / 3 * 100`), multiplied by a confidence multiplier. Exposed for F7 and F10 (rule R5). |
+| `currency_code`, `created_at`, `run_id` | Run metadata. |
