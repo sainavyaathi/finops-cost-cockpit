@@ -73,7 +73,7 @@ Design rules:
 
 ## Known issues and gotchas
 
-- **Upstream retry bug (F6):** `reliability.py` `_retry_cte` groups `job_task_run_timeline` by `run_id`, which is the *task* run id, so `retry_count` is always 0. The fix is to group and join on `job_run_id`.
+- **Upstream retry bug (F6), fixed in the cockpit layer:** upstream `reliability.py` `_retry_cte` groups `job_task_run_timeline` by `run_id`, which is the *task* run id, so `job_reliability_summary.retry_count` is always 0. Upstream still has the bug (R3). The cockpit step `build_job_reliability` (`src/cockpit/steps/job_reliability.py`) writes `cockpit.job_reliability` with `retry_count` recounted per `job_run_id` and `task_key`. Pages and downstream steps should read `job_reliability`, not `job_reliability_summary`.
 - Locally, the message "Catalog creation failed" in `create_catalog_schema` is expected, because local Spark only has `spark_catalog`.
 - Databricks Free Edition: the catalog is `workspace`, synthetic sources are in `workspace.finops_synthetic`, and outputs go to `workspace.cockpit` (rule R4; runs before F1 wrote to `workspace.finops_accelerator`). `system.compute.clusters` is empty there.
 - Never commit tokens. Databricks auth comes from env vars or the Databricks Apps service principal.
