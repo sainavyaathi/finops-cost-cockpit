@@ -49,6 +49,39 @@ cost + utilization + reliability + tagging + attribution
 
 `optimization_candidates` combines the model into a prioritized advisory review backlog.
 
+## Cockpit Tables
+
+Cockpit steps (`src/cockpit/steps/`) run after the upstream pipeline and write to the same cockpit schema (rule R4). They never modify upstream tables (rule R3).
+
+`cost_base` (F1, view) publishes `daily_cost` under the cockpit name.
+
+`idle_compute` (F5, Delta table, step `build_idle_compute`) lists idle and zombie all-purpose clusters. **One row per flagged cluster** (`workspace_id`, `cluster_id`), so summing `idle_cost` or `estimated_monthly_savings` never counts a cluster twice (rule R1). Clusters that are not flagged are not in the table.
+
+- **Population.** The latest row per cluster in `system.compute.clusters` (slowly changing; newest `change_time` wins, and on a tie a row with `delete_time` wins). Deleted clusters are dropped, and only `cluster_source` `UI` or `API` (all-purpose) is kept. Job and pipeline clusters end with their run, even when they report `auto_termination_minutes = 0`.
+- **Zombie configuration.** `auto_termination_minutes = 0` is `AUTO_TERMINATION_OFF`. A value strictly above `zombie_auto_term_minutes` (60) is `AUTO_TERMINATION_TOO_LONG`, so 60 is not flagged and 61 is. NULL means unknown and is not flagged.
+- **Idle.** `system.compute.node_timeline` is averaged per cluster and clock hour, using CPU = user + system and `mem_used_percent`, like `compute_utilization_summary`. Hours are clock hours in the session time zone (UTC on Databricks).
+  - An hour is idle when CPU < `low_cpu_pct` (20) and, when memory is reported, memory < `low_memory_pct` (40). An hour with NULL memory is judged on CPU alone. These two thresholds come from `config/thresholds.yml`, so the cockpit and upstream agree on "low utilisation", and a memory-bound cluster is not idle.
+  - Hours are weighted by the minutes sampled (`COUNT(DISTINCT minute) / 60`), so a cluster seen for 3 minutes of an hour counts 3/60 of an hour. `active_hours` and `idle_hours` are decimal hours.
+  - The cluster is `LOW_UTILIZATION` when at least `idle_hours_share_pct` (50%) of its sampled minutes fell in idle hours.
+  - The window starts at midnight of `current_date - lookback_days`, the same window as `daily_cost` (`usage_date >= current_date - lookback`), so cost and utilisation cover the same days.
+  - **Known approximation:** driver and worker rows are averaged together, as upstream does. A busy driver with idle workers (or the reverse) is blended into one number.
+  - **Open question:** a real zombie whose JVM heap stays allocated can report memory of 40% or more while doing nothing. With `low_memory_pct` = 40 it is then not idle, so F5 may under-flag real zombies. Check this on real `node_timeline` data before tuning.
+  - **Sandbox note:** the synthetic `node_timeline` has one sample every 30 minutes, so its weighted active hours are about 1/30 of clock hours. Flags and the idle share are unaffected, but confidence is mostly MEDIUM there. The real table is per minute.
+- **Flag.** Zombie configuration **and** idle, for example `AUTO_TERMINATION_OFF+LOW_UTILIZATION`. A busy cluster with auto-termination off is not flagged. **Pending decision:** the alternative is "the setting is the finding, idleness adds evidence". Under it, a zombie setting with cost in the lookback is flagged even when the cluster is busy; savings stay NULL and the priority is lower. To switch, set `CONFIG_FLAG_REQUIRES_IDLE = False` in `src/cockpit/steps/idle_compute.py` and update the test expectations. A cluster with auto-termination of 60 minutes or less is not flagged, however idle it is. Its sizing is covered by `compute_utilization_summary` and `optimization_candidates`.
+- **Money.** `estimated_cost` is the cluster's cost in the lookback, from `daily_cost`. `idle_cost = estimated_cost * idle_minutes / active_minutes`, which spreads the cost evenly over the sampled time. `estimated_monthly_cost = estimated_cost * 30 / lookback_days`. `estimated_monthly_savings = idle_cost * 30 / lookback_days`, and it is set only for idle (`LOW_UTILIZATION`) rows. This is an upper bound (every idle hour removed), and it never exceeds the cluster's own monthly cost.
+- **Priority.** `priority_score` (0-100) = 0.60 × savings score + 0.25 × `idle_hours_pct` + 0.15 × config score. The savings score is `estimated_monthly_savings / 1000 * 100`, capped at 100. The config score is 100 for OFF, 60 for TOO_LONG and 50 for unknown.
+- **Confidence.** `HIGH` needs both signals and at least 24 active hours. `MEDIUM` has both signals but fewer hours. `LOW` means one signal is missing.
+- **Degraded modes (`detection_mode`).** The step probes each source table: is it readable, does it have the required columns, and does it have at least one row.
+  - `system.compute.clusters` missing or empty (it is empty on Databricks Free Edition): the mode is `UTILIZATION_ONLY`. All-purpose clusters are found from billing instead: the same predicate as upstream `is_shared_cluster` (`billing_origin_product` `ALL_PURPOSE` or `INTERACTIVE`, or an `ALL_PURPOSE` SKU), and never billed to a job. They are flagged on idleness alone, with `autotermination_minutes` NULL and confidence LOW.
+  - `system.compute.node_timeline` unusable: the mode is `CONFIG_ONLY`. Clusters with a zombie configuration and cost in the lookback are flagged, with `idle_cost` and savings NULL and confidence LOW.
+  - Neither table usable: the table is created empty. In every case the run log says which source was missing.
+
+Columns: `workspace_id`, `cluster_id`, `cluster_name` (falls back to `cluster_id`), `cluster_source`, `owner` (`owned_by`, else the billing owner tag), `autotermination_minutes`, `config_change_time`, `avg_cpu_pct`, `avg_memory_pct`, `active_hours`, `idle_hours`, `idle_hours_pct`, `estimated_cost`, `idle_cost`, `estimated_monthly_cost`, `estimated_monthly_savings` (money as DECIMAL(38,6)), `idle_reason`, `suggested_action`, `detection_mode`, `confidence`, `priority_score`, `evidence`, `lookback_days`, `created_at`, `run_id`.
+
+**Note for F7 (`waste_flags`) and F10.** F4 (`allpurpose_misuse`) and F5 (`idle_compute`) can both carry savings for the same all-purpose cluster.
+- `waste_flags` must collapse them per (`workspace_id`, `cluster_id`) into one saving. Take the larger saving (MAX), or take F5 `idle_cost` and keep F4 as evidence. **Never SUM them** (rule R1).
+- The two steps score `priority_score` on different formulas. F7 needs a common priority scale before the F10 Monday alert takes the top 3 (rule R5).
+
 ## Configurable Rules
 
 Business thresholds live in `config/thresholds.yml`:
@@ -67,6 +100,8 @@ Tagging rules live in `config/tagging_rules.yml`:
 - tag aliases
 
 If either config file is missing or malformed, the accelerator falls back to safe code defaults and writes a WARN health record.
+
+Cockpit-only thresholds live in `config/cockpit_thresholds.yml`, one section per step, loaded by `src/cockpit/step_config.py` (`load_step_thresholds`). That loader reuses the private upstream helpers `_read_yaml_file` and `_numeric_section` read-only; a test pins their signatures. The two files above came with the upstream accelerator and are parsed by its `config.py`, so cockpit keys are kept separate (rule R3). The `idle_compute` section holds the F5 values: `zombie_auto_term_minutes`, `idle_hours_share_pct`, `high_confidence_min_active_hours` and the `priority_*` / `config_score_*` weights. A missing file or key falls back to the code defaults, and the warning is appended to the step's run-log message.
 
 ## Pricing Source
 

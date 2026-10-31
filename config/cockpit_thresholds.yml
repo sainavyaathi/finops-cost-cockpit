@@ -22,3 +22,18 @@ allpurpose_misuse:              # F4: cockpit.allpurpose_misuse
   confidence_multiplier_high: 1.0
   confidence_multiplier_medium: 0.85
   confidence_multiplier_low: 0.7
+
+# F5: cockpit.idle_compute (code defaults: DEFAULTS in src/cockpit/steps/idle_compute.py).
+# The low-utilisation pair (low_cpu_pct, low_memory_pct) is read from config/thresholds.yml, so
+# "low utilisation" means the same thing here and in compute_utilization_summary.
+idle_compute:
+  zombie_auto_term_minutes: 60          # flag auto-termination 0 (off) or strictly above this; 60 is fine, 61 is not
+  idle_hours_share_pct: 50              # LOW_UTILIZATION when at least this share of sampled minutes fell in idle hours
+  high_confidence_min_active_hours: 24  # HIGH confidence needs config, utilisation and this many active hours
+  priority_full_savings_monthly: 1000   # monthly saving that scores 100 (upstream cost_score scale)
+  priority_weight_savings: 0.60         # the three priority weights must add up to 1.0
+  priority_weight_idle: 0.25
+  priority_weight_config: 0.15
+  config_score_off: 100                 # config score: auto-termination off
+  config_score_too_long: 60             # config score: auto-termination above the limit
+  config_score_unknown: 50              # config score: compute.clusters unavailable
