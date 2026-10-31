@@ -7,6 +7,7 @@ realistic synthetic data and redirects the reads, so the repo's own code runs un
 | File | What it does |
 | --- | --- |
 | `finops_sandbox.py` | Synthetic System Table generator + `RedirectingSpark` proxy + `run_accelerator()` |
+| `finops_demo.py` | The `demo` profile: 180 days of company-scale history with storylines (see "Demo profile") |
 | `run_local.py` / `run_local.ps1` | Full end-to-end run on your laptop (PySpark + Delta) |
 | `run_on_databricks.py` | Databricks notebook (Free Edition friendly) doing the same thing |
 | `local_output/` | CSV export of every output table/view from the last local run |
@@ -36,6 +37,7 @@ and `.venv` with pyspark 3.5.3, delta-spark 3.2.1, pandas, pytest, pyyaml.
    or `databricks workspace import-dir`).
 2. Open `sandbox/run_on_databricks` and click **Run all** on serverless compute.
 3. Synthetic sources land in `workspace.finops_synthetic` (all nine tables) and outputs in `workspace.cockpit` (rule R4).
+4. Optional: set the `profile` widget to `demo` for six months of history (lookback becomes 180 days).
 
 ## Synthetic workloads and what they trigger
 
@@ -137,6 +139,106 @@ keeps one billing row per user, because upstream shared-cluster attribution read
 are pinned (see below). The F12 all-purpose clusters `0707`, `0808` and `0909` bill with
 `run_as = NULL`, so the empty case is exercised. **F4 SHARED_USERS must count distinct users from
 `access.audit` `attachNotebook` events per `clusterId`, not from billing `run_as`.**
+
+## Demo profile (`--profile demo`)
+
+The default profile is small on purpose: every scenario is a unit-test fixture. The `demo` profile is
+for showing the cockpit to people. It has six months of history at company scale, with storylines that the trend and
+waste pages can tell.
+
+```bash
+.venv/bin/python sandbox/run_local.py --profile demo          # macOS
+.\sandbox\run_local.ps1 --profile demo                        # Windows
+```
+
+On Databricks, set the notebook's `profile` widget to `demo`. In code, use
+`generate_synthetic_system_tables(spark, schema, profile="demo")` or
+`build_synthetic_rows(profile="demo")`. `--days` and `--lookback-days` override the defaults
+(180 and 180).
+
+**The default profile is unchanged.** `build_synthetic_rows()` with no profile returns byte-identical
+rows. The demo profile starts from the default rows for the same 180 days, unchanged and first in
+every table, then appends its own rows from separate RNG streams (`seed + 101/102/103`). The default
+scenarios and their near-misses are therefore present exactly as tests expect
+(`test_demo_contains_default_rows_unchanged`). The only default-visible difference is length: 180 days instead of 45.
+
+**Scale** (`today` = 2026-10-30, seed 42): 3 workspaces (prod `1111…`, dev `2222…`, analytics `3333…`),
+8 teams (data-eng, ml, analytics, finance, marketing, platform, data-science, sales-ops; the default
+profile adds `fin-eng`), 69 workloads (21 default plus 48 demo entries in `DEMO_WORKLOADS`: 23 `JOB`, 12 `CLUSTER`,
+5 `SQL_WAREHOUSE`, 4 `PIPELINE`, 4 `NOTEBOOK`). 17 of the jobs run on their own job clusters. The other 6 run on
+all-purpose compute: 3010, 3011 and 3012 bring their own all-purpose clusters (`1301`, `1302`, `1303`, billed
+through the job entry with no `job_id`), and 4001, 3018 and 3016 run on existing clusters (`1409`, `1101`) and add
+no billing of their own. That makes 15 all-purpose clusters in all. About $300k over 180 days, priced with the engine's list-price join:
+
+| Month (days before today) | Spend | Untagged (no `team`) | `1202` BI cluster | `wh-bi-serverless-01` | `1404` cluster | ML team |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 (180-151) | $40.5k | 42% | $1.8k | $1.0k | $0.3k | $1.0k |
+| 2 (150-121) | $42.3k | 33% | $2.0k | $1.0k | $0.3k | $1.0k |
+| 3 (120-91) | $50.3k | 24% | $2.1k | $1.1k | $0.3k | $7.1k |
+| 4 (90-61) | $53.2k | 18% | $2.0k | $1.2k | $1.1k | $7.3k |
+| 5 (60-31) | $55.9k | 12% | $0.5k | $2.2k | $1.6k | $7.8k |
+| 6 (30-1) | $58.0k | 8% | $0.2k | $2.5k | $1.7k | $8.0k |
+
+**Storylines.** Each one is anchored in days before `today`, so it lands on the same relative date on every run.
+The constants are at the top of `finops_demo.py`, and each storyline has a test in `tests/test_sandbox_demo.py`.
+
+| Storyline | When | What changes in the data | Shows up in |
+| --- | --- | --- | --- |
+| Growth | all 180 days | Demo workloads' DBUs grow 5% per 30 days (`GROWTH_PER_MONTH`) | F8 trend |
+| ML recommender squad onboards | from 120 days ago (month 3) | `recsys_training` (3101), `recsys_batch_scoring` (3102), `1405-ml-gpu-cluster`, `pl-ml-features-dlt`, `nb-ml-exploration`, plus `ml.*` queries on `wh-ds-adhoc` | F8 step change, F1 by team |
+| Weekly seasonality | Saturdays, Sundays | Interactive clusters, warehouses and notebooks run at 60% (`WEEKEND_FACTOR`); BI audit and query volume drop too | F8 daily trend |
+| Month-end close | last 3 calendar days of each month | `gl_close_batch` x3, `revenue_recognition` x2, `wh-exec-dash` x2 (and twice the queries), `1203-finance-excel-odbc` x2 | F8 spikes, finance team |
+| Failure storm | 140-134 days ago (month 2, one week) | `supplier_feed_ingest`, `payments_ingest` and `crm_contacts_sync` fail about 70% of runs, with `transform` retries; 0% otherwise | F6 failed-run cost, weekly trend |
+| List price change | from 90 days ago (month 4, mid-period) | `PREMIUM_SERVERLESS_SQL_COMPUTE_US_EAST` goes from 0.70 to 0.77 USD/DBU: two `billing.list_prices` rows whose windows meet at midnight | F1 (cost up with flat DBUs) |
+| Auto-termination switched off | 80 days ago (month 4) | `1404-ds-sandbox-cluster` gets a `compute.clusters` change row from 30 to 0, stamped at midnight of that day. From then on it bills 24h a day at CPU 3%, and nobody attaches notebooks | F5 positive, cost about 5x |
+| BI moves to a SQL warehouse | 55 days ago (month 5) | `1202-bi-powerbi-cluster`'s Power BI ODBC and Tableau JDBC `commandSubmit` events switch from `clusterId` to `warehouseId = wh-bi-serverless-01`, along with their queries. The cluster drops to 8% of its usage, the warehouse adds 85 DBU/day, and the two together cost about 30% less | F4 fixed, F3, F8 saving |
+| Tagging campaign | 155 to 35 days ago | Workloads with `untagged_until` carry no tags or partial `pre_tags` until that day (new `compute.clusters` / `lakeflow.jobs` rows record the change, stamped at midnight so the day's billing matches). The share of spend with no `team` falls from about 41% to about 8%. `1102-ds-shared-cluster`, `crm_api_push`, `legacy_report_mailer`, `nb-sales-ops-adhoc` and `1408` are never tagged | F2 trend, untagged backlog |
+
+**Waste cases** added on top of the default ones, so rankings have several sizes:
+
+| Feature | Positive | Near-miss |
+| --- | --- | --- |
+| F4 BI on all-purpose | `1202-bi-powerbi-cluster` (until month 5), `1204-looker-jdbc-cluster` (Looker JDBC), `1203-finance-excel-odbc` (Excel ODBC). All three also have weekday `query.history` rows with `compute.type = CLUSTER`, `compute.cluster_id` set and a JDBC/ODBC `client_driver`, for the MEDIUM-confidence path (assumption below) | `1202` after migration, `wh-bi-serverless-01` (same drivers on a warehouse) |
+| F4 scheduled jobs on all-purpose | `daily_marketing_export` (3010, CRON, `1301`, plus 6 `ONETIME_RETRY` repair runs that also count), `platform_audit_export` (3012, PERIODIC, `1303`), `crm_api_push` (3011, `run_type = SUBMIT_RUN`, `trigger_type = ONETIME`, on an `API` cluster `1302`), the external orchestrator `airflow__finance_extract` (`SUBMIT_RUN`, `ONETIME`, **`job_id` NULL** in both timelines, task rows included, on the existing UI cluster `1409-finance-adhoc`) | 17 CRON jobs on job clusters; `finance_restatement` (3018, manual, every 14 days on `1409`) and its 3 `ONETIME_RETRY` repairs (a repair of a manual job is not scheduled); `exec_kpi_rollup` (3016, `run_type = WORKFLOW_RUN`, `ONETIME`: a child run started by `dbutils.notebook.run` from a notebook on the existing cluster `1101`, with no `lakeflow.jobs` row and no billing of its own) |
+| F4 shared users | `1101-analytics-shared` (6 users), `1102-ds-shared-cluster` (4 users) | `1405`, `1406`, `1408`, `1409`, `1410` (1 user each) |
+| F5 idle / zombie | `1404` (0 from month 4, idle 24/7), `1405-ml-gpu-cluster` (120 min, CPU 9%), `1408-dev-sandbox-autoterm-90` (90 min, CPU 5%) | `1406-analytics-autoterm-60` and `1101` (exactly 60), `1407-platform-ops-autoterm-off` (off but CPU 68%), `1409` (20 min, CPU 40%) |
+| F6 reliability | `marketing_attribution` (3009, about 30% failures), `lead_scoring` (3013, about 60% of runs retry `transform`), the storm jobs | `data_quality_checks` (3014, long sliced task, no retries) |
+| F2 tagging | see "Tagging campaign". Partial tags: `inventory_snapshot`, `revenue_recognition`, `pl-inventory-dlt`, `wh-analytics-shared` (alias key `Project` only) | ML workloads, tagged from day one |
+| F3 catalog split | `wh-analytics-shared` (sales, marketing, finance, product, plus a backticked cross-catalog join), `wh-ds-adhoc` (ml, sales, product, plus two-part names), `wh-exec-dash` (finance, sales), `wh-bi-serverless-01` (sales_ops, sales) | `wh-mkt-001` (marketing only) |
+
+**Things to know when demoing:**
+
+- `run_local.py --profile demo` runs the upstream engine with `--lookback-days 180`. The upstream
+  summaries (`workload_cost_summary`, `compute_utilization_summary`, `job_reliability_summary`,
+  `optimization_candidates`, `vw_executive_summary` and the pages that read them) therefore show
+  **180-day aggregates**. `optimization_candidates.estimated_monthly_cost` is still scaled to 30 days
+  (upstream multiplies by `30 / lookback_days`). The cockpit steps (F3 to F7) will get their own 30-day
+  detection window in a separate change. Until then, "current state" flags such as BI on `1202` cover the whole 180 days.
+- The failure storm adds about 2 percentage points to the 180-day failure rate of the three storm jobs.
+  It shows in daily or weekly views, not in the 180-day `job_reliability_summary`. `retry_count`
+  there stays 0 because of the upstream bug below.
+- Spark's `current_date()` runs in UTC (`spark.sql.session.timeZone`), but the generator's `today` is
+  the local date. Run late in the evening in a timezone behind UTC (or early morning ahead of it)
+  and the first or last day can fall just outside the lookback. This is true of both profiles.
+- Size: about 438k rows, 315k of them in `compute_node_timeline` (30-minute samples, 3 nodes). The local
+  run takes about 60 s on a laptop (20 s to generate and write, the rest is the engine), against about 30-40 s for default.
+- **Not yet tested on Databricks Free Edition.** `generate_synthetic_system_tables` builds each table with
+  `spark.createDataFrame` from Python rows, so about 438k rows (315k node rows) go through the serverless
+  driver. If that is too slow or hits limits, halve the node volume by keeping only on-the-hour samples for the
+  demo workloads: in `build_demo_rows`, filter `extra["compute_node_timeline"]` to `start_time.minute == 0`
+  before the rows are appended. Leave the default rows alone so their digests still match. Per-cluster averages barely move.
+  This is documented only and not implemented, so the generator keeps no hidden settings.
+- **Assumptions to check on a real account.**
+  - `runs/submit` runs appear in two shapes: `crm_api_push` (a `job_id` with no `lakeflow.jobs` row) and the
+    external orchestrator (`job_id` NULL). F4 should rely on `job_run_timeline.run_type` / `trigger_type` and
+    `compute_ids`, not on the jobs table.
+  - A repair run is modelled as its own run row: a new `run_id` (original id + `1`), `trigger_type = ONETIME_RETRY`,
+    `run_type = JOB_RUN`, re-running `transform` and `load`. To tell whether it counts as scheduled, look up the job's
+    `lakeflow.jobs.trigger_type`.
+  - Notebook-workflow child runs (`exec_kpi_rollup`, `run_type = WORKFLOW_RUN`) carry an ephemeral `job_id` in
+    both timelines but have no `lakeflow.jobs` definition.
+  - `query.history` with `compute.type = CLUSTER`: the reference describes SQL warehouses and serverless
+    compute, so classic-cluster rows may never appear for real. Treat that path as MEDIUM confidence at best.
 
 ## Known issue found in the upstream repo
 

@@ -617,9 +617,22 @@ def _emit_workload(rng, out, w, day, offset, midnight) -> None:
         ))
 
 
-def build_synthetic_rows(days: int = 45, seed: int = 42, today: date | None = None) -> dict[str, list[dict]]:
-    """Every row is a function of (days, seed, today). ``today`` defaults to the current date
-    so a fresh run is date-relative; tests pin it."""
+# Profiles: "default" is the small scenario set above (45 days); "demo" adds six months of
+# company-scale history with storylines on top of it (sandbox/finops_demo.py).
+PROFILES = {"default": 45, "demo": 180}  # profile -> default number of days
+
+
+def build_synthetic_rows(days: int | None = None, seed: int = 42, today: date | None = None,
+                         profile: str = "default") -> dict[str, list[dict]]:
+    """Every row is a function of (profile, days, seed, today). ``today`` defaults to the
+    current date so a fresh run is date-relative; tests pin it. ``days`` defaults per profile."""
+    if profile not in PROFILES:
+        raise ValueError(f"Unknown sandbox profile {profile!r}; use one of {sorted(PROFILES)}")
+    days = PROFILES[profile] if days is None else days
+    if profile == "demo":
+        from finops_demo import build_demo_rows
+
+        return build_demo_rows(days=days, seed=seed, today=today)
     rng = random.Random(seed)
     today = today or date.today()
     out: dict[str, list[dict]] = {name: [] for name in SYSTEM_TABLE_MAP.values()}
@@ -912,18 +925,20 @@ def _query_history_rows(rng, days: int, today: date) -> list[dict[str, Any]]:
 def generate_synthetic_system_tables(
     spark: Any,
     target_schema: str,
-    days: int = 45,
+    days: int | None = None,
     seed: int = 42,
     today: date | None = None,
+    profile: str = "default",
 ) -> dict[str, int]:
     """Create (or replace) the synthetic System Tables under ``target_schema``.
 
     ``target_schema`` is a two-part name such as ``workspace.finops_synthetic`` (Databricks)
-    or ``spark_catalog.synthetic_system`` (local).
+    or ``spark_catalog.synthetic_system`` (local). ``profile`` is "default" (45 days of
+    designed scenarios) or "demo" (180 days, company scale, storylines; see README).
     """
     spark.sql(f"CREATE SCHEMA IF NOT EXISTS {target_schema}")
     schemas = _schemas()
-    rows = build_synthetic_rows(days=days, seed=seed, today=today)
+    rows = build_synthetic_rows(days=days, seed=seed, today=today, profile=profile)
     counts = {}
     for table, data in rows.items():
         df = spark.createDataFrame(data, schema=schemas[table])
