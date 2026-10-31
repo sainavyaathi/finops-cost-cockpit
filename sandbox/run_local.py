@@ -1,26 +1,32 @@
 """Run the FinOps accelerator end to end on your laptop with synthetic System Tables.
 
 Usage (from the repo root):
-    .\\sandbox\\run_local.ps1
+    .\\sandbox\\run_local.ps1                    # default profile: 45 days, 30-day lookback
+    .\\sandbox\\run_local.ps1 --profile demo     # 180 days of company-scale history, 180-day lookback
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "sandbox"))
 
-from finops_sandbox import generate_synthetic_system_tables, run_accelerator  # noqa: E402
+from finops_sandbox import PROFILES, generate_synthetic_system_tables, run_accelerator  # noqa: E402
 
 SOURCE_SCHEMA = "spark_catalog.synthetic_system"
 CATALOG = "spark_catalog"  # local Spark only has the session catalog
 SCHEMA = "cockpit"  # rule R4: all outputs go to the cockpit schema
 OUTPUT_DIR = ROOT / "sandbox" / "local_output"
+# Upstream lookback per profile: demo covers its whole 180-day history so cost_base and trends
+# span six months.
+DEFAULT_LOOKBACK = {"default": 30, "demo": 180}
 
 
 def build_spark():
@@ -52,16 +58,44 @@ def show(spark, title: str, query: str, n: int = 20) -> None:
     spark.sql(query).show(n, truncate=60)
 
 
-def main() -> None:
+def _positive_int(text: str) -> int:
+    value = int(text)
+    if value < 1:
+        raise argparse.ArgumentTypeError(f"must be at least 1, got {value}")
+    return value
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Synthetic system tables -> FinOps pipeline -> CSVs.")
+    parser.add_argument("--profile", choices=sorted(PROFILES), default="default",
+                        help="default: designed scenarios (45 days); demo: 6 months, company scale")
+    parser.add_argument("--days", type=_positive_int, default=None, help="days of history (default per profile)")
+    parser.add_argument("--lookback-days", type=_positive_int, default=None,
+                        help="upstream engine lookback (default: 30, or 180 for demo; never more than --days)")
+    return parser.parse_args(argv)
+
+
+def resolve_lookback(args: argparse.Namespace) -> int:
+    if args.lookback_days is not None:
+        return args.lookback_days
+    default = DEFAULT_LOOKBACK[args.profile]
+    return default if args.days is None else min(args.days, default)
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = parse_args(argv)
+    lookback = resolve_lookback(args)
+    started = time.perf_counter()
     spark = build_spark()
 
-    print("Generating synthetic system tables ...")
-    counts = generate_synthetic_system_tables(spark, SOURCE_SCHEMA)
+    print(f"Generating synthetic system tables (profile={args.profile}) ...")
+    counts = generate_synthetic_system_tables(spark, SOURCE_SCHEMA, days=args.days, profile=args.profile)
     for table, count in counts.items():
         print(f"  {SOURCE_SCHEMA}.{table}: {count} rows")
+    print(f"  generated in {time.perf_counter() - started:.0f}s")
 
-    print("\nRunning databricks_finops pipeline ...")
-    run_id, logger = run_accelerator(spark, SOURCE_SCHEMA, CATALOG, SCHEMA, str(ROOT))
+    print(f"\nRunning databricks_finops pipeline (lookback_days={lookback}) ...")
+    run_id, logger = run_accelerator(spark, SOURCE_SCHEMA, CATALOG, SCHEMA, str(ROOT), lookback)
     print(f"run_id = {run_id}")
     for rec in logger.records:
         rows = "" if rec.rows_written is None else f" rows={rec.rows_written}"
@@ -94,6 +128,7 @@ def main() -> None:
     for name in names:
         spark.table(f"{t}.{name}").toPandas().to_csv(OUTPUT_DIR / f"{name}.csv", index=False)
     print(f"\nExported {len(names)} tables/views to {OUTPUT_DIR}")
+    print(f"Total {time.perf_counter() - started:.0f}s (profile={args.profile}, lookback_days={lookback})")
     spark.stop()
 
 

@@ -1,5 +1,5 @@
 # Runs the accelerator end to end locally on synthetic System Tables.
-# Usage (from the repo root):  .\sandbox\run_local.ps1
+# Usage (from the repo root):  .\sandbox\run_local.ps1  [--profile demo]
 $root = Split-Path -Parent $PSScriptRoot
 
 $env:JAVA_HOME = (Get-ChildItem "$env:LOCALAPPDATA\Programs\jdk17" -Directory | Select-Object -First 1).FullName
@@ -9,4 +9,4 @@ $env:PYSPARK_PYTHON = "$root\.venv\Scripts\python.exe"
 $env:PYSPARK_DRIVER_PYTHON = $env:PYSPARK_PYTHON
 $env:SPARK_HOME = "$root\.venv\Lib\site-packages\pyspark"
 
-& $env:PYSPARK_PYTHON "$root\sandbox\run_local.py"
+& $env:PYSPARK_PYTHON "$root\sandbox\run_local.py" @args

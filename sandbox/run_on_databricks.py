@@ -9,17 +9,24 @@
 # MAGIC
 # MAGIC Requires the whole repo folder to be in your workspace (this notebook lives in `<repo>/sandbox/`).
 # MAGIC Set `USE_REAL_SYSTEM_TABLES = True` to try your real `system.billing.usage` instead.
+# MAGIC
+# MAGIC The `profile` widget picks the synthetic data set: `default` (45 days of designed scenarios,
+# MAGIC 30-day lookback) or `demo` (180 days of company-scale history with storylines, 180-day lookback).
+# MAGIC In `real` mode the profile is ignored and the lookback stays 30 days.
 
 # COMMAND ----------
 
 dbutils.widgets.dropdown("mode", "synthetic", ["synthetic", "real"])
 dbutils.widgets.text("schema", "cockpit")
+dbutils.widgets.dropdown("profile", "default", ["default", "demo"])
 
 CATALOG = "workspace"                                   # Free Edition default catalog
 SCHEMA = dbutils.widgets.get("schema")                  # outputs
 SOURCE_SCHEMA = "workspace.finops_synthetic"
-LOOKBACK_DAYS = 30
+PROFILE = dbutils.widgets.get("profile")
 USE_REAL_SYSTEM_TABLES = dbutils.widgets.get("mode") == "real"
+# Demo trends cover its six months; real system tables keep the standard 30-day lookback.
+LOOKBACK_DAYS = 180 if PROFILE == "demo" and not USE_REAL_SYSTEM_TABLES else 30
 
 # COMMAND ----------
 
@@ -71,7 +78,7 @@ if USE_REAL_SYSTEM_TABLES:
     finally:
         write_run_log(spark, CATALOG, SCHEMA, logger)
 else:
-    counts = generate_synthetic_system_tables(spark, SOURCE_SCHEMA)
+    counts = generate_synthetic_system_tables(spark, SOURCE_SCHEMA, profile=PROFILE)
     print(counts)
     run_id, logger = run_accelerator(spark, SOURCE_SCHEMA, CATALOG, SCHEMA, REPO_ROOT, LOOKBACK_DAYS)
 
